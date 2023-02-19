@@ -8,6 +8,8 @@
 #include "Log.h"
 #include "ShaderProgram.h"
 #include "Shader.h"
+#include "Mesh.h"
+#include "Line.h"
 
 // CALLBACKS
 class MyCallbacks : public CallbackInterface {
@@ -107,11 +109,11 @@ public:
 	// and then returns the index of the first point within that distance from
 	// the cursor.
 	// Returns -1 if no such point is found.
-	int indexOfPointAtCursorPos(const std::vector<glm::vec3>& glCoordsOfPointsToSearch, float screenCoordThreshold) {
+	int indexOfPointAtCursorPos(const std::vector<Vertex>& glCoordsOfPointsToSearch, float screenCoordThreshold) {
 		// First, we conver thte points from GL to screen coordinates.
 		std::vector<glm::vec3> screenCoordVerts;
 		for (const auto& v : glCoordsOfPointsToSearch) {
-			screenCoordVerts.push_back(glm::vec3(glPosToScreenCoords(v), 0.f));
+			screenCoordVerts.push_back(glm::vec3(glPosToScreenCoords(v.position), 0.f));
 		}
 
 		// We make sure we interpret the cursor position as at the centre of
@@ -178,36 +180,19 @@ int main() {
 	window.setupImGui(); // Make sure this call comes AFTER GLFW callbacks set.
 
 	// GEOMETRY
-	CPU_Geometry cpuGeom;
-	GPU_Geometry gpuGeom;
+	Line line;
 
 	// vertices
-	cpuGeom.verts.push_back(glm::vec3(-0.5f, -0.5f, 0.f));
-	cpuGeom.verts.push_back(glm::vec3(0.5f, -0.5f, 0.f));
-	cpuGeom.verts.push_back(glm::vec3(0.f, 0.5f, 0.f));
-
-	// colours (these should be in linear space)
-	cpuGeom.cols.push_back(glm::vec3(1.f, 0.f, 0.f));
-	cpuGeom.cols.push_back(glm::vec3(0.f, 1.f, 0.f));
-	cpuGeom.cols.push_back(glm::vec3(0.f, 0.f, 1.f));
-
-	gpuGeom.setVerts(cpuGeom.verts);
-	gpuGeom.setCols(cpuGeom.cols);
+	line.verts.push_back(Vertex{ glm::vec3(-0.5f, -0.5f, 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
+	line.verts.push_back(Vertex{ glm::vec3(0.5f, -0.5f, 0.f), glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.0f) });
+	line.verts.push_back(Vertex{ glm::vec3(0.f, 0.5f, 0.f), glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.0f) });
+	line.updateGPU();
 
 	// Variables that ImGui will alter.
 	float pointSize = 5.f; // Diameter of drawn points
 	float color[3] = { 1.f, 0.f, 0.f }; // Color of new points
 	bool drawLines = true; // Whether to draw connecting lines
 	int selectedPointIndex = -1; // Used for point dragging & deletion
-
-	// Variables for the commented-out widgets.
-	/*
-	int sampleInt = 0;
-	float sampleFloat = 0.f;
-	float sampleDragFloat = 0.f;
-	float sampleAngle = 0.f;
-	float sampleFloatPair[2] = { 1.f, 2.f };
-	*/
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
@@ -223,35 +208,29 @@ int main() {
 			// You may want to change that.
 			float threshold = pointSize;
 
-			selectedPointIndex = cb->indexOfPointAtCursorPos(cpuGeom.verts, threshold);
+			selectedPointIndex = cb->indexOfPointAtCursorPos(line.verts, threshold);
 		}
 
 		
 		if (cb->leftMouseJustPressed()) {
 			if (selectedPointIndex < 0) {
 				// If we just clicked empty space, add new point.
-				cpuGeom.verts.push_back(glm::vec3(cb->getCursorPosGL(), 0.f));
-				cpuGeom.cols.push_back(glm::vec3(color[0], color[1], color[2]));
-
-				gpuGeom.setVerts(cpuGeom.verts);
-				gpuGeom.setCols(cpuGeom.cols);
+				line.verts.push_back(Vertex{ glm::vec3(cb->getCursorPosGL(), 0.f), glm::vec3(color[0], color[1], color[2]), glm::vec3(0.0f) });
+				line.updateGPU();
 			}
 		}
 		else if (cb->rightMouseJustPressed()) {
 			if (selectedPointIndex >= 0) {
 				// If we right-clicked on a vertex, erase it.
-				cpuGeom.verts.erase(cpuGeom.verts.begin() + selectedPointIndex);
-				cpuGeom.cols.erase(cpuGeom.cols.begin() + selectedPointIndex);
+				line.verts.erase(line.verts.begin() + selectedPointIndex);
 				selectedPointIndex = -1; // So that we don't drag in next frame.
-
-				gpuGeom.setVerts(cpuGeom.verts);
-				gpuGeom.setCols(cpuGeom.cols);
+				line.updateGPU();
 			}
 		}
 		else if (cb->leftMouseActive() && selectedPointIndex >= 0) {
 			// Drag selected point.
-			cpuGeom.verts[selectedPointIndex] = glm::vec3(cb->getCursorPosGL(), 0.f);
-			gpuGeom.setVerts(cpuGeom.verts);
+			line.verts[selectedPointIndex].position = glm::vec3(cb->getCursorPosGL(), 0.f);
+			line.updateGPU();
 		}
 
 		bool change = false; // Whether any ImGui variable's changed.
@@ -273,41 +252,21 @@ int main() {
 
 		if (ImGui::Button("clear pts")) {
 			change = true;
-			cpuGeom.verts.clear();
-			cpuGeom.cols.clear();
-			gpuGeom.setVerts(cpuGeom.verts);
-			gpuGeom.setCols(cpuGeom.cols);
+			line.verts.clear();
+			line.updateGPU();
 		}
 
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-		// Commented out ImGui widgets from tutorial video.
-		// Check ImGui samples/GitHub/etc. for more cool options, like graphs!
-		/*
-		change |= ImGui::InputInt("sample int", &sampleInt, 2);
-		change |= ImGui::InputFloat("sample float", &sampleFloat, 0.5f);
-		change |= ImGui::DragFloat("sample dragger:", &sampleDragFloat, 1.f, 0.f, 100.f);
-		bool changeAngle = false;
-		change |= changeAngle = ImGui::SliderAngle("sample angle", &sampleAngle);
-		change |= ImGui::SliderFloat2("sample float pair", (float*)&sampleFloatPair, -15, 15);
-		if (change) {
-			std::cout << "Change detected! " << std::endl;
-			if (changeAngle) std::cout << "Sample angle: " << sampleAngle << std::endl;
-		}
-		*/
-
 		ImGui::End();
 		ImGui::Render();
 
-		shader.use();
-		gpuGeom.bind();
-
-		glPointSize(pointSize);
-
 		glEnable(GL_FRAMEBUFFER_SRGB);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		if (drawLines) glDrawArrays(GL_LINE_STRIP, 0, GLsizei(cpuGeom.verts.size()));
-		glDrawArrays(GL_POINTS, 0, GLsizei(cpuGeom.verts.size()));
+		
+		if (drawLines) line.draw(shader);
+		line.drawPoints(pointSize, shader);
+
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

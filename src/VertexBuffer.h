@@ -1,13 +1,14 @@
 #pragma once
 
 #include "GLHandles.h"
-
+#include <vector>
 #include <glad/glad.h>
 
 
 class VertexBuffer {
 
 public:
+	VertexBuffer(std::vector<GLint> sizes, int stride);
 	VertexBuffer(GLuint index, GLint size, GLenum dataType);
 
 	// Because we're using the VertexBufferHandle to do RAII for the buffer for us

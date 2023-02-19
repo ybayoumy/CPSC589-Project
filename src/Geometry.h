@@ -8,19 +8,19 @@
 
 #include "VertexArray.h"
 #include "VertexBuffer.h"
+#include "ElementBuffer.h"
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
 #include <vector>
 
-
-// List of vertices and colour using std::vector and glm::vec3
-struct CPU_Geometry {
-	std::vector<glm::vec3> verts;
-	std::vector<glm::vec3> cols;
+struct Vertex
+{
+	glm::vec3 position;
+	glm::vec3 color;
+	glm::vec3 normal;
 };
-
 
 // VAO and two VBOs for storing vertices and colours, respectively
 class GPU_Geometry {
@@ -31,8 +31,8 @@ public:
 	// Public interface
 	void bind() { vao.bind(); }
 
-	void setVerts(const std::vector<glm::vec3>& verts);
-	void setCols(const std::vector<glm::vec3>& cols);
+	void setVerts(const std::vector<Vertex>& verts);
+	void setIndices(const std::vector<unsigned int>& indices);
 
 private:
 	// note: due to how OpenGL works, vao needs to be 
@@ -40,5 +40,5 @@ private:
 	VertexArray vao;
 
 	VertexBuffer vertBuffer;
-	VertexBuffer colBuffer;
+	ElementBuffer indexBuffer;
 };
