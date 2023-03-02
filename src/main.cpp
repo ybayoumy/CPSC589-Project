@@ -159,8 +159,6 @@ private:
 };
 
 
-
-
 int main() {
 	Log::debug("Starting main");
 
@@ -184,14 +182,12 @@ int main() {
 
 	// vertices
 	line.verts.push_back(Vertex{ glm::vec3(-0.5f, -0.5f, 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
-	line.verts.push_back(Vertex{ glm::vec3(0.5f, -0.5f, 0.f), glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.0f) });
-	line.verts.push_back(Vertex{ glm::vec3(0.f, 0.5f, 0.f), glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.0f) });
+	line.verts.push_back(Vertex{ glm::vec3(0.5f, -0.5f, 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
+	line.verts.push_back(Vertex{ glm::vec3(0.f, 0.5f, 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
 	line.updateGPU();
 
 	// Variables that ImGui will alter.
 	float pointSize = 5.f; // Diameter of drawn points
-	float color[3] = { 1.f, 0.f, 0.f }; // Color of new points
-	bool drawLines = true; // Whether to draw connecting lines
 	int selectedPointIndex = -1; // Used for point dragging & deletion
 
 	// RENDER LOOP
@@ -211,11 +207,10 @@ int main() {
 			selectedPointIndex = cb->indexOfPointAtCursorPos(line.verts, threshold);
 		}
 
-		
 		if (cb->leftMouseJustPressed()) {
 			if (selectedPointIndex < 0) {
 				// If we just clicked empty space, add new point.
-				line.verts.push_back(Vertex{ glm::vec3(cb->getCursorPosGL(), 0.f), glm::vec3(color[0], color[1], color[2]), glm::vec3(0.0f) });
+				line.verts.push_back(Vertex{ glm::vec3(cb->getCursorPosGL(), 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
 				line.updateGPU();
 			}
 		}
@@ -242,14 +237,6 @@ int main() {
 
 		ImGui::Begin("Sample window.");
 
-		ImGui::Text("Sample text.");
-
-		change |= ImGui::SliderFloat("Point size", &pointSize, 1.f, 20.f);
-
-		change |= ImGui::ColorEdit3("New pt color", (float*)&color);
-
-		change |= ImGui::Checkbox("Draw lines", &drawLines);
-
 		if (ImGui::Button("clear pts")) {
 			change = true;
 			line.verts.clear();
@@ -264,7 +251,7 @@ int main() {
 		glEnable(GL_FRAMEBUFFER_SRGB);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
-		if (drawLines) line.draw(shader);
+		line.draw(shader);
 		line.drawPoints(pointSize, shader);
 
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui
