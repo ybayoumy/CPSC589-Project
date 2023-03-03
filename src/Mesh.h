@@ -37,6 +37,6 @@ public:
 
 	Mesh()
 		: verts()
-		, indices() 
+		, indices()
 	{}
 };

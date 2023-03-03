@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15.0)
-project(sketch-based-editor)
+project(589-project)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -48,8 +48,10 @@ add_subdirectory(thirdparty/fmt-7.0.3)
 set(LIBRARIES ${LIBRARIES} fmt::fmt)
 include_directories(SYSTEM thirdparty/fmt-7.0.3/include)
 
+include_directories(SYSTEM thirdparty/stb-2.26)
 include_directories(SYSTEM thirdparty/imgui-1.89.2)
 
+include_directories(thirdparty/tinyobjloader-2.0.0rc10)
 
 find_package(OpenGL REQUIRED)
 set(LIBRARIES ${LIBRARIES} ${OPENGL_gl_LIBRARY})
@@ -76,10 +78,11 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 
 endif()
 
-if(UNIX)
-	set(LIBRARIES ${LIBRARIES} pthread GL dl)
-endif(UNIX)
-if (WIN32)
+if(APPLE)
+    set(LIBRARIES ${LIBRARIES} pthread dl)
+elseif(UNIX)
+    set(LIBRARIES ${LIBRARIES} pthread GL dl)
+elseif(WIN32)
 endif()
 
 
@@ -95,14 +98,30 @@ file(GLOB SOURCES
 )
 set(INCLUDES ${INCLUDES} src)
 
-set(APP_NAME "sketch-based-editor")
+set(APP_NAME "589-project")
 
 
-# Copy all the shaders and tell the build system to re-run CMAKE if one of them changes
-file(GLOB files src/shaders/*)
+# Copy all the shaders and tell the build system to re-run CMAKE if one of them changes.
+# We use GLOB_RECURSE so that the "shaders" directory can have subfolders.
+file(GLOB_RECURSE files src/shaders/*)
 foreach(file ${files})
-	get_filename_component(name ${file} NAME)
-	configure_file(${file} shaders/${name})
+	# We need to extract the relative path of each file for when we copy it over.
+	file(RELATIVE_PATH fileName ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/ ${file})
+	configure_file(${file} shaders/${fileName} COPYONLY)
+endforeach()
+
+# Do the same for textures.
+file(GLOB_RECURSE files_t textures/*)
+foreach(file ${files_t})
+	file(RELATIVE_PATH fileName ${CMAKE_CURRENT_SOURCE_DIR}/textures/ ${file})
+	configure_file(${file} textures/${fileName} COPYONLY)
+endforeach()
+
+# Do the same for 3D model files.
+file(GLOB_RECURSE files_m models/*)
+foreach(file ${files_m})
+	file(RELATIVE_PATH fileName ${CMAKE_CURRENT_SOURCE_DIR}/models/ ${file})
+	configure_file(${file} models/${fileName} COPYONLY)
 endforeach()
 
 add_executable(${APP_NAME} ${SOURCES})

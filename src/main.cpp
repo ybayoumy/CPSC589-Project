@@ -1,4 +1,10 @@
 #include <iostream>
+#include <string>
+#include <list>
+#include <vector>
+#include <limits>
+#include <functional>
+#include <unordered_map>
 
 // Window.h `#include`s ImGui, GLFW, and glad in correct order.
 #include "Window.h"
@@ -8,30 +14,72 @@
 #include "Log.h"
 #include "ShaderProgram.h"
 #include "Shader.h"
-#include "Mesh.h"
-#include "Line.h"
+#include "Camera.h"
+#include "Mesh.h";
 
-// CALLBACKS
-class MyCallbacks : public CallbackInterface {
+#include "glm/glm.hpp"
+#include "glm/gtc/type_ptr.hpp"
+
+#define PI 3.14159
+
+Mesh unitSphere(int granularity, glm::vec3 col) {
+	float angleStep = PI / granularity;
+
+	Mesh res;
+
+	// calculating points
+	for (int j = 0; j < 2 * granularity + 1; j++) {
+		float phi = angleStep * j;
+		for (int i = 0; i < granularity + 1; i++) {
+			float theta = angleStep * i;
+			glm::vec3 point(glm::sin(theta) * glm::sin(phi), glm::cos(theta), glm::sin(theta) * glm::cos(phi));
+			res.verts.push_back(Vertex{ point, col, point });
+		}
+	}
+
+	// creating faces using vertex indices
+	for (int i = 1; i < granularity + 1; i++) {
+		for (int j = 0; j < 2 * granularity + 1; j++) {
+			if (j != 0) {
+				res.indices.push_back((granularity + 1) * j + i);
+				res.indices.push_back((granularity + 1) * (j - 1) + i);
+				res.indices.push_back((granularity + 1) * j + i - 1);
+			}
+
+			if (j != 2 * granularity) {
+				res.indices.push_back((granularity + 1) * j + i);
+				res.indices.push_back((granularity + 1) * j + i - 1);
+				res.indices.push_back((granularity + 1) * (j + 1) + i - 1);
+			}
+		}
+	}
+
+	return res;
+}
+
+// EXAMPLE CALLBACKS
+class Callbacks3D : public CallbackInterface {
 
 public:
 	// Constructor. We use values of -1 for attributes that, at the start of
 	// the program, have no meaningful/"true" value.
-	MyCallbacks(ShaderProgram& shader, int screenWidth, int screenHeight)
+	Callbacks3D(ShaderProgram& shader, int screenWidth, int screenHeight)
 		: shader(shader)
-		, currentFrame(0)
-		, leftMouseActiveVal(false)
-		, lastLeftPressedFrame(-1)
-		, lastRightPressedFrame(-1)
-		, screenMouseX(-1.0)
-		, screenMouseY(-1.0)
+		, camera(glm::radians(45.f), glm::radians(45.f), 3.0)
+		, aspect(1.0f)
+		, rightMouseDown(false)
+		, mouseOldX(-1.0)
+		, mouseOldY(-1.0)
 		, screenWidth(screenWidth)
 		, screenHeight(screenHeight)
-	{}
+	{
+		updateUniformLocations();
+	}
 
 	virtual void keyCallback(int key, int scancode, int action, int mods) {
 		if (key == GLFW_KEY_R && action == GLFW_PRESS) {
 			shader.recompile();
+			updateUniformLocations();
 		}
 	}
 
@@ -42,17 +90,9 @@ public:
 		auto& io = ImGui::GetIO();
 		if (io.WantCaptureMouse && action == GLFW_PRESS) return;
 
-
-		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-			leftMouseActiveVal = true;
-			lastLeftPressedFrame = currentFrame;
-		}
-		if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
-			lastRightPressedFrame = currentFrame;
-		}
-
-		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-			leftMouseActiveVal = false;
+		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+			if (action == GLFW_PRESS)			rightMouseDown = true;
+			else if (action == GLFW_RELEASE)	rightMouseDown = false;
 		}
 	}
 
@@ -61,38 +101,46 @@ public:
 	virtual void windowSizeCallback(int width, int height) {
 		screenWidth = width;
 		screenHeight = height;
+		aspect = float(width) / float(height);
 	}
 
-	// Sets the new cursor position, in screen coordinates
 	virtual void cursorPosCallback(double xpos, double ypos) {
-		screenMouseX = xpos;
-		screenMouseY = ypos;
+		if (rightMouseDown) {
+			camera.incrementTheta(ypos - mouseOldY);
+			camera.incrementPhi(xpos - mouseOldX);
+		}
+		mouseOldX = xpos;
+		mouseOldY = ypos;
+	}
+	virtual void scrollCallback(double xoffset, double yoffset) {
+		camera.incrementR(yoffset);
 	}
 
-	// Whether the left mouse was pressed down this frame.
-	bool leftMouseJustPressed() {
-		return lastLeftPressedFrame == currentFrame;
+	void viewPipeline() {
+		glm::mat4 M = glm::mat4(1.0);
+		glm::mat4 V = camera.getView();
+		glm::mat4 P = glm::perspective(glm::radians(45.0f), aspect, 0.01f, 1000.f);
+		glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(M));
+		glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(V));
+		glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(P));
 	}
 
-	// Whether the left mouse button is being pressed down at all.
-	bool leftMouseActive() {
-		return leftMouseActiveVal;
-	}
-
-	// Whether the right mouse button was pressed down this frame.
-	bool rightMouseJustPressed() {
-		return lastRightPressedFrame == currentFrame;
-	}
-
-	// Tell the callbacks object a new frame has begun.
-	void incrementFrameCount() {
-		currentFrame++;
+	void updateShadingUniforms(
+		const glm::vec3& lightPos, const glm::vec3& lightCol,
+		const glm::vec3& diffuseCol, float ambientStrength
+	)
+	{
+		// Like viewPipeline(), this function assumes shader.use() was called before.
+		glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(lightColLoc, lightCol.r, lightCol.g, lightCol.b);
+		glUniform3f(diffuseColLoc, diffuseCol.r, diffuseCol.g, diffuseCol.b);
+		glUniform1f(ambientStrengthLoc, ambientStrength);
 	}
 
 	// Converts the cursor position from screen coordinates to GL coordinates
 	// and returns the result.
 	glm::vec2 getCursorPosGL() {
-		glm::vec2 screenPos(screenMouseX, screenMouseY);
+		glm::vec2 screenPos(mouseOldX, mouseOldY);
 		// Interpret click as at centre of pixel.
 		glm::vec2 centredPos = screenPos + glm::vec2(0.5f, 0.5f);
 		// Scale cursor position to [0, 1] range.
@@ -103,59 +151,42 @@ public:
 		// Go from [0, 1] range to [-1, 1] range.
 		return 2.f * flippedY - glm::vec2(1.f, 1.f);
 	}
-	
-	// Takes in a list of points, given in GL's coordinate system,
-	// and a threshold (in screen coordinates) 
-	// and then returns the index of the first point within that distance from
-	// the cursor.
-	// Returns -1 if no such point is found.
-	int indexOfPointAtCursorPos(const std::vector<Vertex>& glCoordsOfPointsToSearch, float screenCoordThreshold) {
-		// First, we conver thte points from GL to screen coordinates.
-		std::vector<glm::vec3> screenCoordVerts;
-		for (const auto& v : glCoordsOfPointsToSearch) {
-			screenCoordVerts.push_back(glm::vec3(glPosToScreenCoords(v.position), 0.f));
-		}
-
-		// We make sure we interpret the cursor position as at the centre of
-		// the relevant pixel, for consistency with getCursorPosGL().
-		glm::vec3 cursorPosScreen(screenMouseX + 0.5f, screenMouseY + 0.5f, 0.f);
 
 
-		for (size_t i = 0; i < screenCoordVerts.size(); i++) {
-			// Return i if length of difference vector within threshold.
-			glm::vec3 diff = screenCoordVerts[i] - cursorPosScreen;
-			if (glm::length(diff) < screenCoordThreshold) {
-				return i;
-			}
-		}
-		return -1; // No point within threshold found.
+	Camera camera;
+private:
+	// Uniform locations do not, ordinarily, change between frames.
+	// However, we may need to update them if the shader is changed and recompiled.
+	void updateUniformLocations() {
+		mLoc = glGetUniformLocation(shader, "M");
+		vLoc = glGetUniformLocation(shader, "V");
+		pLoc = glGetUniformLocation(shader, "P");;
+		lightPosLoc = glGetUniformLocation(shader, "lightPos");;
+		lightColLoc = glGetUniformLocation(shader, "lightCol");;
+		diffuseColLoc = glGetUniformLocation(shader, "diffuseCol");;
+		ambientStrengthLoc = glGetUniformLocation(shader, "ambientStrength");;
+		texExistenceLoc = glGetUniformLocation(shader, "texExistence");;
 	}
 
-private:
 	int screenWidth;
 	int screenHeight;
 
-	double screenMouseX;
-	double screenMouseY;
+	bool rightMouseDown;
+	float aspect;
+	double mouseOldX;
+	double mouseOldY;
 
-	int currentFrame;
-
-	bool leftMouseActiveVal;
-
-	int lastLeftPressedFrame;
-	int lastRightPressedFrame;
+	// Uniform locations
+	GLint mLoc;
+	GLint vLoc;
+	GLint pLoc;
+	GLint lightPosLoc;
+	GLint lightColLoc;
+	GLint diffuseColLoc;
+	GLint ambientStrengthLoc;
+	GLint texExistenceLoc;
 
 	ShaderProgram& shader;
-
-	// Converts GL coordinates to screen coordinates.
-	glm::vec2 glPosToScreenCoords(glm::vec2 glPos) {
-		// Convert the [-1, 1] range to [0, 1]
-		glm::vec2 scaledZeroOne = 0.5f * (glPos + glm::vec2(1.f, 1.f));
-
-		glm::vec2 flippedY = glm::vec2(scaledZeroOne.x, 1.0f - scaledZeroOne.y);
-		glm::vec2 screenPos = flippedY * glm::vec2(screenWidth, screenHeight);
-		return screenPos;
-	}
 };
 
 
@@ -164,71 +195,36 @@ int main() {
 
 	// WINDOW
 	glfwInit();
-	Window window(800, 800, "CPSC 589/689"); // could set callbacks at construction if desired
+	Window window(800, 800, "CPSC 589 Project"); // could set callbacks at construction if desired
 
 	GLDebug::enable();
 
 	// SHADERS
 	ShaderProgram shader("shaders/test.vert", "shaders/test.frag");
 
-	auto cb = std::make_shared<MyCallbacks>(shader, window.getWidth(), window.getHeight());
+	auto cb = std::make_shared<Callbacks3D>(shader, window.getWidth(), window.getHeight());
 	// CALLBACKS
 	window.setCallbacks(cb);
 
 	window.setupImGui(); // Make sure this call comes AFTER GLFW callbacks set.
 
-	// GEOMETRY
-	Line line;
+	// Some variables for shading that ImGui may alter.
+	glm::vec3 lightPos(0.f, 35.f, -35.f);
+	glm::vec3 lightCol(1.f);
+	glm::vec3 diffuseCol(1.f, 0.f, 0.f);
+	float ambientStrength = 0.035f;
+	bool simpleWireframe = false;
 
-	// vertices
-	line.verts.push_back(Vertex{ glm::vec3(-0.5f, -0.5f, 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
-	line.verts.push_back(Vertex{ glm::vec3(0.5f, -0.5f, 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
-	line.verts.push_back(Vertex{ glm::vec3(0.f, 0.5f, 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
-	line.updateGPU();
+	// Set the initial, default values of the shading uniforms.
+	shader.use();
+	cb->updateShadingUniforms(lightPos, lightCol, diffuseCol, ambientStrength);
 
-	// Variables that ImGui will alter.
-	float pointSize = 5.f; // Diameter of drawn points
-	int selectedPointIndex = -1; // Used for point dragging & deletion
+	Mesh sphere = unitSphere(20, glm::vec3{ 1.0f, 0.0f, 0.0f });
+	sphere.updateGPU();
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
-
-		// Tell callbacks object a new frame's begun BEFORE polling events!
-		cb->incrementFrameCount();
 		glfwPollEvents();
-
-		// If mouse just went down, see if it was on a point.
-		if (cb->leftMouseJustPressed() || cb->rightMouseJustPressed()) {
-			// We use the point DIAMETER as the threshold, meaning the user
-			// can click anywhere within 2x radius to select.
-			// You may want to change that.
-			float threshold = pointSize;
-
-			selectedPointIndex = cb->indexOfPointAtCursorPos(line.verts, threshold);
-		}
-
-		if (cb->leftMouseJustPressed()) {
-			if (selectedPointIndex < 0) {
-				// If we just clicked empty space, add new point.
-				line.verts.push_back(Vertex{ glm::vec3(cb->getCursorPosGL(), 0.f), glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.0f) });
-				line.updateGPU();
-			}
-		}
-		else if (cb->rightMouseJustPressed()) {
-			if (selectedPointIndex >= 0) {
-				// If we right-clicked on a vertex, erase it.
-				line.verts.erase(line.verts.begin() + selectedPointIndex);
-				selectedPointIndex = -1; // So that we don't drag in next frame.
-				line.updateGPU();
-			}
-		}
-		else if (cb->leftMouseActive() && selectedPointIndex >= 0) {
-			// Drag selected point.
-			line.verts[selectedPointIndex].position = glm::vec3(cb->getCursorPosGL(), 0.f);
-			line.updateGPU();
-		}
-
-		bool change = false; // Whether any ImGui variable's changed.
 
 		// Three functions that must be called each new frame.
 		ImGui_ImplOpenGL3_NewFrame();
@@ -237,22 +233,38 @@ int main() {
 
 		ImGui::Begin("Sample window.");
 
-		if (ImGui::Button("clear pts")) {
-			change = true;
-			line.verts.clear();
-			line.updateGPU();
-		}
+		bool change = false; // Whether any ImGui variable's changed.
 
+		change |= ImGui::ColorEdit3("Diffuse colour", glm::value_ptr(diffuseCol));
+
+		// The rest of our ImGui widgets.
+		change |= ImGui::DragFloat3("Light's position", glm::value_ptr(lightPos));
+		change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
+		change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
+		change |= ImGui::Checkbox("Simple wireframe", &simpleWireframe);
+
+		// Framerate display, in case you need to debug performance.
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
 		ImGui::End();
 		ImGui::Render();
 
+		glEnable(GL_LINE_SMOOTH);
 		glEnable(GL_FRAMEBUFFER_SRGB);
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		line.draw(shader);
-		line.drawPoints(pointSize, shader);
+		glEnable(GL_DEPTH_TEST);
+		glPolygonMode(GL_FRONT_AND_BACK, (simpleWireframe ? GL_LINE : GL_FILL) );
+
+		shader.use();
+		if (change)
+		{
+			// If any of our shading values was updated, we need to update the
+			// respective GLSL uniforms.
+			cb->updateShadingUniforms(lightPos, lightCol, diffuseCol, ambientStrength);
+		}
+		cb->viewPipeline();
+
+		sphere.draw(shader);
 
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui
 

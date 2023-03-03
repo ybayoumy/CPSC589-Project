@@ -1,3 +1,36 @@
+
+Skip to content
+Pull requests
+Issues
+Codespaces
+Marketplace
+Explore
+@ybayoumy
+ybayoumy /
+CPSC589-Project
+Public
+
+Cannot fork because you own this repository and are not a member of any organizations.
+
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+
+    Settings
+
+Beta Try the new code view
+CPSC589-Project/.gitignore
+@ybayoumy
+ybayoumy Adding boilerplate
+Latest commit 1035aa8 Feb 18, 2023
+History
+1 contributor
+304 lines (246 sloc) 5.08 KB
 # Own stuff here
 build
 compile_commands.json
@@ -302,3 +335,20 @@ __pycache__/
 # should be stored in the .pubxml.user file.
 
 # End of https://www.gitignore.io/api/visualstudio
+Footer
+© 2023 GitHub, Inc.
+Footer navigation
+
+    Terms
+    Privacy
+    Security
+    Status
+    Docs
+    Contact GitHub
+    Pricing
+    API
+    Training
+    Blog
+    About
+
+CPSC589-Project/.gitignore at main · ybayoumy/CPSC589-Project
