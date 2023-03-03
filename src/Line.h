@@ -35,7 +35,7 @@ public:
 		geometry.setVerts(verts);
 	}
 
-	Line(std::vector<Vertex>& v)
+	Line(std::vector<Vertex> v)
 		: verts(v)
 	{}
 

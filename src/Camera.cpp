@@ -23,12 +23,16 @@ glm::vec3 Camera::getPos() {
 }
 
 void Camera::incrementTheta(float dt) {
+	if (isFixed) return;
+
 	if (theta + (dt / 100.0f) < M_PI_2 && theta + (dt / 100.0f) > -M_PI_2) {
 		theta += dt / 100.0f;
 	}
 }
 
 void Camera::incrementPhi(float dp) {
+	if (isFixed) return;
+
 	phi -= dp / 100.0f;
 	if (phi > 2.0 * M_PI) {
 		phi -= 2.0 * M_PI;
@@ -38,5 +42,7 @@ void Camera::incrementPhi(float dp) {
 }
 
 void Camera::incrementR(float dr) {
+	if (isFixed) return;
+
 	radius -= dr;
 }

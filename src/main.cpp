@@ -16,6 +16,7 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Mesh.h";
+#include "Line.h";
 
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -63,11 +64,12 @@ class Callbacks3D : public CallbackInterface {
 public:
 	// Constructor. We use values of -1 for attributes that, at the start of
 	// the program, have no meaningful/"true" value.
-	Callbacks3D(ShaderProgram& shader, int screenWidth, int screenHeight)
+	Callbacks3D(ShaderProgram& shader, Camera& camera, int screenWidth, int screenHeight)
 		: shader(shader)
-		, camera(glm::radians(45.f), glm::radians(45.f), 3.0)
+		, camera(camera)
 		, aspect(1.0f)
 		, rightMouseDown(false)
+		, leftMouseDown(false)
 		, mouseOldX(-1.0)
 		, mouseOldY(-1.0)
 		, screenWidth(screenWidth)
@@ -93,6 +95,11 @@ public:
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			if (action == GLFW_PRESS)			rightMouseDown = true;
 			else if (action == GLFW_RELEASE)	rightMouseDown = false;
+		}
+
+		if (button == GLFW_MOUSE_BUTTON_LEFT) {
+			if (action == GLFW_PRESS)			leftMouseDown = true;
+			else if (action == GLFW_RELEASE)	leftMouseDown = false;
 		}
 	}
 
@@ -126,14 +133,12 @@ public:
 	}
 
 	void updateShadingUniforms(
-		const glm::vec3& lightPos, const glm::vec3& lightCol,
-		const glm::vec3& diffuseCol, float ambientStrength
+		const glm::vec3& lightPos, const glm::vec3& lightCol, float ambientStrength
 	)
 	{
 		// Like viewPipeline(), this function assumes shader.use() was called before.
 		glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(lightColLoc, lightCol.r, lightCol.g, lightCol.b);
-		glUniform3f(diffuseColLoc, diffuseCol.r, diffuseCol.g, diffuseCol.b);
 		glUniform1f(ambientStrengthLoc, ambientStrength);
 	}
 
@@ -152,8 +157,9 @@ public:
 		return 2.f * flippedY - glm::vec2(1.f, 1.f);
 	}
 
+	bool rightMouseDown;
+	bool leftMouseDown;
 
-	Camera camera;
 private:
 	// Uniform locations do not, ordinarily, change between frames.
 	// However, we may need to update them if the shader is changed and recompiled.
@@ -163,15 +169,12 @@ private:
 		pLoc = glGetUniformLocation(shader, "P");;
 		lightPosLoc = glGetUniformLocation(shader, "lightPos");;
 		lightColLoc = glGetUniformLocation(shader, "lightCol");;
-		diffuseColLoc = glGetUniformLocation(shader, "diffuseCol");;
 		ambientStrengthLoc = glGetUniformLocation(shader, "ambientStrength");;
-		texExistenceLoc = glGetUniformLocation(shader, "texExistence");;
 	}
 
 	int screenWidth;
 	int screenHeight;
 
-	bool rightMouseDown;
 	float aspect;
 	double mouseOldX;
 	double mouseOldY;
@@ -182,11 +185,10 @@ private:
 	GLint pLoc;
 	GLint lightPosLoc;
 	GLint lightColLoc;
-	GLint diffuseColLoc;
 	GLint ambientStrengthLoc;
-	GLint texExistenceLoc;
 
 	ShaderProgram& shader;
+	Camera& camera;
 };
 
 
@@ -200,31 +202,54 @@ int main() {
 	GLDebug::enable();
 
 	// SHADERS
-	ShaderProgram shader("shaders/test.vert", "shaders/test.frag");
+	ShaderProgram lightingShader("shaders/lighting3D.vert", "shaders/lighting3D.frag");
+	ShaderProgram noLightingShader("shaders/nolighting3D.vert", "shaders/nolighting3D.frag");
 
-	auto cb = std::make_shared<Callbacks3D>(shader, window.getWidth(), window.getHeight());
+	Camera cam(glm::radians(45.f), glm::radians(45.f), 3.0);
+	auto cb = std::make_shared<Callbacks3D>(lightingShader, cam, window.getWidth(), window.getHeight());
 	// CALLBACKS
 	window.setCallbacks(cb);
 
 	window.setupImGui(); // Make sure this call comes AFTER GLFW callbacks set.
 
 	// Some variables for shading that ImGui may alter.
-	glm::vec3 lightPos(0.f, 35.f, -35.f);
+	glm::vec3 lightPos(0.f, 35.f, 35.f);
 	glm::vec3 lightCol(1.f);
-	glm::vec3 diffuseCol(1.f, 0.f, 0.f);
 	float ambientStrength = 0.035f;
 	bool simpleWireframe = false;
+	bool inDrawMode = false;
 
 	// Set the initial, default values of the shading uniforms.
-	shader.use();
-	cb->updateShadingUniforms(lightPos, lightCol, diffuseCol, ambientStrength);
+	lightingShader.use();
+	cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 
-	Mesh sphere = unitSphere(20, glm::vec3{ 1.0f, 0.0f, 0.0f });
+	Mesh sphere = unitSphere(20, glm::vec3{ 0.0f, 0.0f, 1.0f });
 	sphere.updateGPU();
+
+	glm::vec3 lineColor{ 0.0f, 1.0f, 0.0f };
+	std::vector<Line> lines;
+	Line* lineInProgress = nullptr;
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
 		glfwPollEvents();
+
+		if (inDrawMode && cb->leftMouseDown) {
+			glm::vec3 cursorPos = glm::vec3(cb->getCursorPosGL(), 0.0f);
+			Vertex newPoint = Vertex{ cursorPos, lineColor, glm::vec3(0.0f) };
+			if (lineInProgress) {
+				// add point to line in progress
+				lineInProgress->verts.push_back(newPoint);
+			}
+			else {
+				// create a new line
+				lines.emplace_back(std::vector<Vertex>{newPoint});
+				lineInProgress = &lines.back();
+			}
+			lineInProgress->updateGPU();
+		}
+		else if (!inDrawMode || !cb->leftMouseDown) 
+			lineInProgress = nullptr;
 
 		// Three functions that must be called each new frame.
 		ImGui_ImplOpenGL3_NewFrame();
@@ -235,18 +260,28 @@ int main() {
 
 		bool change = false; // Whether any ImGui variable's changed.
 
-		change |= ImGui::ColorEdit3("Diffuse colour", glm::value_ptr(diffuseCol));
+		//change |= ImGui::ColorEdit3("Diffuse colour", glm::value_ptr(diffuseCol));
 
 		// The rest of our ImGui widgets.
-		change |= ImGui::DragFloat3("Light's position", glm::value_ptr(lightPos));
-		change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
-		change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
+		//change |= ImGui::DragFloat3("Light's position", glm::value_ptr(lightPos));
+		//change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
+		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
 		change |= ImGui::Checkbox("Simple wireframe", &simpleWireframe);
+		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
 
 		// Framerate display, in case you need to debug performance.
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::End();
 		ImGui::Render();
+
+		if (change) {
+			if (inDrawMode) {
+				cam = Camera(0.0f, 0.0f, 3.0f);
+				cam.fix();
+			}
+			else 
+				cam.unFix();
+		}
 
 		glEnable(GL_LINE_SMOOTH);
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -255,16 +290,22 @@ int main() {
 		glEnable(GL_DEPTH_TEST);
 		glPolygonMode(GL_FRONT_AND_BACK, (simpleWireframe ? GL_LINE : GL_FILL) );
 
-		shader.use();
+		lightingShader.use();
 		if (change)
 		{
 			// If any of our shading values was updated, we need to update the
 			// respective GLSL uniforms.
-			cb->updateShadingUniforms(lightPos, lightCol, diffuseCol, ambientStrength);
+			cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 		}
 		cb->viewPipeline();
 
-		sphere.draw(shader);
+		noLightingShader.use();
+		cb->viewPipeline();
+		sphere.draw(lightingShader);
+
+		for (Line& line : lines) {
+			line.draw(noLightingShader);
+		}
 
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui
 

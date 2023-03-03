@@ -20,7 +20,11 @@ public:
 	void incrementPhi(float dp);
 	void incrementR(float dr);
 
+	void fix() { isFixed = true; }
+	void unFix() { isFixed = false; }
+
 private:
+	bool isFixed = false;
 
 	float theta;
 	float phi;
