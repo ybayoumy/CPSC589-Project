@@ -235,7 +235,10 @@ int main() {
 		glfwPollEvents();
 
 		if (inDrawMode && cb->leftMouseDown) {
-			glm::vec3 cursorPos = glm::vec3(cb->getCursorPosGL(), 0.0f);
+			float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
+			glm::vec4 cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
+			cursorPos = glm::inverse(cam.getView()) * cursorPos;
+
 			Vertex newPoint = Vertex{ cursorPos, lineColor, glm::vec3(0.0f) };
 			if (lineInProgress) {
 				// add point to line in progress
@@ -256,7 +259,7 @@ int main() {
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		ImGui::Begin("Sample window.");
+		ImGui::Begin("CPSC 589 Project");
 
 		bool change = false; // Whether any ImGui variable's changed.
 
@@ -276,11 +279,11 @@ int main() {
 
 		if (change) {
 			if (inDrawMode) {
-				cam = Camera(0.0f, 0.0f, 3.0f);
 				cam.fix();
 			}
-			else 
+			else {
 				cam.unFix();
+			}
 		}
 
 		glEnable(GL_LINE_SMOOTH);
@@ -293,16 +296,13 @@ int main() {
 		lightingShader.use();
 		if (change)
 		{
-			// If any of our shading values was updated, we need to update the
-			// respective GLSL uniforms.
 			cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 		}
 		cb->viewPipeline();
+		sphere.draw(lightingShader);
 
 		noLightingShader.use();
 		cb->viewPipeline();
-		sphere.draw(lightingShader);
-
 		for (Line& line : lines) {
 			line.draw(noLightingShader);
 		}

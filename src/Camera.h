@@ -23,7 +23,6 @@ public:
 	void fix() { isFixed = true; }
 	void unFix() { isFixed = false; }
 
-private:
 	bool isFixed = false;
 
 	float theta;
