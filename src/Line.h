@@ -111,7 +111,6 @@ public:
 
 		for (int i = 0; i <= precision; i++) {
 			u = double(i) / precision;
-			std::cout << u << std::endl;
 			spline.push_back(getvert(verts, basis, u, 3, verts.size() - 1));
 		}
 

@@ -71,6 +71,7 @@ Mesh unitSphere(int granularity, glm::vec3 col) {
 	// creating faces using vertex indices
 	for (int i = 1; i < granularity + 1; i++) {
 		for (int j = 0; j < 2 * granularity + 1; j++) {
+
 			if (j != 0) {
 				res.indices.push_back((granularity + 1) * j + i);
 				res.indices.push_back((granularity + 1) * (j - 1) + i);
@@ -225,21 +226,12 @@ private:
 };
 
 std::vector<glm::vec3> makecircle() {
-	int tinc = 12;
+	int tinc = 16;
 	std::vector<glm::vec3> unitcircle;
 	for (int i = 0; i < tinc; i++) {
 		float angle = i * 2 * M_PI / tinc;
 		unitcircle.push_back(glm::vec3{ 0, sin(angle), cos(angle) });
 	}
-	return unitcircle;
-}
-
-std::vector<glm::vec3> makesquare() {
-	std::vector<glm::vec3> unitcircle;
-	unitcircle.push_back(glm::vec3(0, sqrt(2), -sqrt(2)));
-	unitcircle.push_back(glm::vec3(0, sqrt(2), sqrt(2)));
-	unitcircle.push_back(glm::vec3(0, -sqrt(2), sqrt(2)));
-	unitcircle.push_back(glm::vec3(0, -sqrt(2), -sqrt(2)));
 	return unitcircle;
 }
 
@@ -328,7 +320,7 @@ int main() {
 		}
 
 		if (ImGui::Button("Create Rotational Blending Surface")) {
-			mymesh.create(lines[0].verts, lines[1].verts, 2, glm::vec3(1.f, 0.f, 0.f), makecircle());
+			mymesh.create(lines[0].verts, lines[1].verts, 50, glm::vec3(1.f, 0.f, 0.f), makecircle());
 			mymesh.updateGPU();
 		}
 
