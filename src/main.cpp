@@ -22,6 +22,33 @@
 #include "glm/gtc/type_ptr.hpp"
 
 #define PI 3.14159
+std::vector<glm::vec3> listOfMouseLocations;
+std::vector<glm::vec3> listOfChaikinPoints;
+
+std::vector<glm::vec3> reverseChaikinAlgorithm(std::vector<glm::vec3> mousePoints) {
+	double xj, yj;
+	std::vector<glm::vec3> Chaikin;
+	for (int i = 0; i < mousePoints.size(); i += 3) {
+		xj = 0;
+		yj = 0;
+		if ((0 <= (i - 1)) && ((i - 1) <= mousePoints.size())) {
+			xj -= 0.25 * mousePoints[i - 1].x;
+			yj -= 0.25 * mousePoints[i - 1].y;
+		}
+		xj += 0.75 * mousePoints[i].x;
+		yj += 0.75 * mousePoints[i].y;
+		if ((0 <= (i + 1)) && ((i + 1) <= mousePoints.size())) {
+			xj += 0.75 * mousePoints[i + 1].x;
+			yj += 0.75 * mousePoints[i + 1].y;
+		}
+		if ((0 <= (i + 2)) && ((i + 2) <= mousePoints.size())) {
+			xj -= 0.25 * mousePoints[i + 2].x;
+			yj -= 0.25 * mousePoints[i + 2].y;
+		}
+		Chaikin.push_back(glm::vec3(xj, yj, 0));
+	}
+	return Chaikin;
+}
 
 Mesh unitSphere(int granularity, glm::vec3 col) {
 	float angleStep = PI / granularity;
@@ -115,6 +142,9 @@ public:
 		if (rightMouseDown) {
 			camera.incrementTheta(ypos - mouseOldY);
 			camera.incrementPhi(xpos - mouseOldX);
+		}
+		if (leftMouseDown) {
+			listOfMouseLocations.push_back(glm::vec3(xpos, ypos, 0));
 		}
 		mouseOldX = xpos;
 		mouseOldY = ypos;
