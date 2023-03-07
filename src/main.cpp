@@ -1,4 +1,8 @@
 #include <iostream>
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include <string>
 #include <list>
 #include <vector>
@@ -21,7 +25,6 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-#define PI 3.14159
 std::vector<glm::vec3> listOfMouseLocations;
 std::vector<glm::vec3> listOfChaikinPoints;
 
@@ -51,7 +54,7 @@ std::vector<glm::vec3> reverseChaikinAlgorithm(std::vector<glm::vec3> mousePoint
 }
 
 Mesh unitSphere(int granularity, glm::vec3 col) {
-	float angleStep = PI / granularity;
+	float angleStep = M_PI / granularity;
 
 	Mesh res;
 
@@ -221,6 +224,24 @@ private:
 	Camera& camera;
 };
 
+std::vector<glm::vec3> makecircle() {
+	int tinc = 12;
+	std::vector<glm::vec3> unitcircle;
+	for (int i = 0; i < tinc; i++) {
+		float angle = i * 2 * M_PI / tinc;
+		unitcircle.push_back(glm::vec3{ 0, sin(angle), cos(angle) });
+	}
+	return unitcircle;
+}
+
+std::vector<glm::vec3> makesquare() {
+	std::vector<glm::vec3> unitcircle;
+	unitcircle.push_back(glm::vec3(0, sqrt(2), -sqrt(2)));
+	unitcircle.push_back(glm::vec3(0, sqrt(2), sqrt(2)));
+	unitcircle.push_back(glm::vec3(0, -sqrt(2), sqrt(2)));
+	unitcircle.push_back(glm::vec3(0, -sqrt(2), -sqrt(2)));
+	return unitcircle;
+}
 
 int main() {
 	Log::debug("Starting main");
@@ -253,8 +274,7 @@ int main() {
 	lightingShader.use();
 	cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 
-	Mesh sphere = unitSphere(20, glm::vec3{ 0.0f, 0.0f, 1.0f });
-	sphere.updateGPU();
+	Mesh mymesh;
 
 	glm::vec3 lineColor{ 0.0f, 1.0f, 0.0f };
 	std::vector<Line> lines;
@@ -302,6 +322,16 @@ int main() {
 		change |= ImGui::Checkbox("Simple wireframe", &simpleWireframe);
 		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
 
+		if (ImGui::Button("View XY Plane")) {
+			cam.phi = 0.f;
+			cam.theta = 0.f;
+		}
+
+		if (ImGui::Button("Create Rotational Blending Surface")) {
+			mymesh.create(lines[0].verts, lines[1].verts, 2, glm::vec3(1.f, 0.f, 0.f), makecircle());
+			mymesh.updateGPU();
+		}
+
 		// Framerate display, in case you need to debug performance.
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::End();
@@ -329,7 +359,7 @@ int main() {
 			cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 		}
 		cb->viewPipeline();
-		sphere.draw(lightingShader);
+		mymesh.draw(lightingShader);
 
 		noLightingShader.use();
 		cb->viewPipeline();
