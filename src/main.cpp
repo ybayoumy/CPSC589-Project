@@ -279,6 +279,8 @@ int main() {
 	std::vector<glm::vec3> views;
 	std::vector<glm::vec3> ups;
 
+	int meshchoice = 0;
+
 	// RENDER LOOP
 	while (!window.shouldClose()) {
 		glfwPollEvents();
@@ -295,7 +297,7 @@ int main() {
 			}
 			else {
 				// create a new line
-				sweeps.push_back(cam.getcircle(12));
+				sweeps.push_back(cam.getcircle(16));
 				views.push_back(cam.getPos());
 				ups.push_back(cam.getUp());
 
@@ -304,7 +306,7 @@ int main() {
 			}
 			lineInProgress->updateGPU();
 		}
-		else if (!inDrawMode || !cb->leftMouseDown) 
+		else if (!inDrawMode || !cb->leftMouseDown)
 			lineInProgress = nullptr;
 
 		// Three functions that must be called each new frame.
@@ -332,18 +334,30 @@ int main() {
 
 		if (ImGui::Button("View XZ Plane")) {
 			cam.phi = 0.f;
-			cam.theta = M_PI/2;
+			cam.theta = M_PI / 2;
 		}
 
 		if (ImGui::Button("View ZY Plane")) {
-			cam.phi = M_PI/2;
+			cam.phi = M_PI / 2;
 			cam.theta = 0.f;
 		}
 
-		if (ImGui::Button("Make Circle")) {
-			std::vector<glm::vec3> circ = cam.getcircle(4);
-			for (auto i = circ.begin(); i < circ.end(); i++) {
-				std::cout << (*i) << std::endl;
+		if (meshes.size() > 0) {
+			ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
+			if (meshchoice > 0) {
+				if (lines.size() % 2 != 0) {
+					if (ImGui::Button("Update Sweep")) {
+						sweeps[meshchoice - 1] = lines.back().BSpline(16);
+						meshes.clear();
+						for (int i = 0; i < lines.size()-1; i = i + 2) {
+							meshes.emplace_back();
+							meshInProgress = &meshes.back();
+							meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i], ups[i], views[i]);
+							meshInProgress->updateGPU();
+							meshInProgress = nullptr;
+						}
+					}
+				}
 			}
 		}
 
@@ -353,7 +367,7 @@ int main() {
 				for (int i = 0; i < lines.size(); i = i + 2) {
 					meshes.emplace_back();
 					meshInProgress = &meshes.back();
-					meshInProgress->create(lines[i].verts, lines[i + 1].verts, 40, glm::vec3(1.f, 0.f, 0.f), sweeps[i], ups[i], views[i]);
+					meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i], ups[i], views[i]);
 					meshInProgress->updateGPU();
 					meshInProgress = nullptr;
 				}

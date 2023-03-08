@@ -23,10 +23,9 @@ glm::vec3 Camera::getPos() {
 }
 
 glm::vec3 Camera::getUp() {
-	/*glm::vec3 eye = radius * glm::vec3(std::cos(theta) * std::sin(phi), std::sin(theta), std::cos(theta) * std::cos(phi));
-	if (eye != glm::vec3(0.f, 0.f, 1.f)) return glm::cross(eye, glm::vec3(0.f, 0.f, 1.f));
-	else*/
-	return glm::vec3(0.f, 1.f, 0.f);
+	glm::vec3 eye = radius * glm::vec3(std::cos(theta) * std::sin(phi), std::sin(theta), std::cos(theta) * std::cos(phi));
+	if (eye == glm::vec3(0.f, radius, 0.f)) return glm::vec3(1.f, 0.f, 0.f);
+	else return glm::vec3(0.f, radius, 0.f);
 }
 
 void Camera::incrementTheta(float dt) {
@@ -62,7 +61,7 @@ std::vector<glm::vec3> Camera::getcircle(int inc) {
 	std::vector<glm::vec3> circle;
 	for (int i = 0; i < inc; i++) {
 		float angle = i * 2 * M_PI / inc;
-		glm::vec3 point = glm::inverse(glm::lookAt(eye, at, up)) * glm::vec4(cos(angle), sin(angle), -radius, 1.f);
+		glm::vec3 point = glm::rotate(glm::mat4(1.f), -float(M_PI) / 2, up) * glm::inverse(glm::lookAt(eye, at, up)) * glm::vec4(cos(angle), sin(angle), -radius, 1.f);
 		circle.push_back(point);
 	}
 	return circle;
