@@ -45,9 +45,6 @@ int delta(std::vector <float> U, float u, int k, int m) {
 // Efficient algorithm to find a value of the B-Spline at a given u value (from A2 and Lecture)
 glm::vec3 getvert(std::vector<Vertex> E, std::vector <float> U, float u, int k, int m) {
 
-
-	
-
 	float omega;
 	float denom;
 	int i;

@@ -5,6 +5,7 @@
 //------------------------------------------------------------------------------
 
 //#include <GL/glew.h>
+#include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -16,6 +17,9 @@ public:
 
 	glm::mat4 getView();
 	glm::vec3 getPos();
+	glm::vec3 getUp();
+	std::vector<glm::vec3> getcircle(int inc);
+
 	void incrementTheta(float dt);
 	void incrementPhi(float dp);
 	void incrementR(float dr);

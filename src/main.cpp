@@ -225,12 +225,14 @@ private:
 	Camera& camera;
 };
 
-std::vector<glm::vec3> makecircle() {
-	int tinc = 16;
+std::vector<glm::vec3> makecircle(glm::vec3 up, glm::vec2 cam) {
+	int tinc = 24;
 	std::vector<glm::vec3> unitcircle;
 	for (int i = 0; i < tinc; i++) {
 		float angle = i * 2 * M_PI / tinc;
-		unitcircle.push_back(glm::vec3{ 0, sin(angle), cos(angle) });
+		glm::mat4 R = glm::rotate(glm::mat4(1.f), cam.x + float(M_PI/2), up);
+		glm::vec3 point = R * glm::vec4(cos(angle), sin(angle), 0, 1.f);
+		unitcircle.push_back(point);
 	}
 	return unitcircle;
 }
@@ -266,11 +268,16 @@ int main() {
 	lightingShader.use();
 	cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 
-	Mesh mymesh;
+	std::vector<Mesh> meshes;
+	Mesh* meshInProgress = nullptr;
 
 	glm::vec3 lineColor{ 0.0f, 1.0f, 0.0f };
 	std::vector<Line> lines;
 	Line* lineInProgress = nullptr;
+
+	std::vector<std::vector<glm::vec3>> sweeps;
+	std::vector<glm::vec3> views;
+	std::vector<glm::vec3> ups;
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
@@ -288,6 +295,10 @@ int main() {
 			}
 			else {
 				// create a new line
+				sweeps.push_back(cam.getcircle(12));
+				views.push_back(cam.getPos());
+				ups.push_back(cam.getUp());
+
 				lines.emplace_back(std::vector<Vertex>{newPoint});
 				lineInProgress = &lines.back();
 			}
@@ -319,9 +330,34 @@ int main() {
 			cam.theta = 0.f;
 		}
 
-		if (ImGui::Button("Create Rotational Blending Surface")) {
-			mymesh.create(lines[0].verts, lines[1].verts, 50, glm::vec3(1.f, 0.f, 0.f), makecircle());
-			mymesh.updateGPU();
+		if (ImGui::Button("View XZ Plane")) {
+			cam.phi = 0.f;
+			cam.theta = M_PI/2;
+		}
+
+		if (ImGui::Button("View ZY Plane")) {
+			cam.phi = M_PI/2;
+			cam.theta = 0.f;
+		}
+
+		if (ImGui::Button("Make Circle")) {
+			std::vector<glm::vec3> circ = cam.getcircle(4);
+			for (auto i = circ.begin(); i < circ.end(); i++) {
+				std::cout << (*i) << std::endl;
+			}
+		}
+
+		if (lines.size() % 2 == 0 && lines.size() != 0) {
+			if (ImGui::Button("Create Rotational Blending Surface")) {
+				meshes.clear();
+				for (int i = 0; i < lines.size(); i = i + 2) {
+					meshes.emplace_back();
+					meshInProgress = &meshes.back();
+					meshInProgress->create(lines[i].verts, lines[i + 1].verts, 40, glm::vec3(1.f, 0.f, 0.f), sweeps[i], ups[i], views[i]);
+					meshInProgress->updateGPU();
+					meshInProgress = nullptr;
+				}
+			}
 		}
 
 		// Framerate display, in case you need to debug performance.
@@ -351,8 +387,10 @@ int main() {
 			cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 		}
 		cb->viewPipeline();
-		mymesh.draw(lightingShader);
-
+		for (Mesh& mesh : meshes) {
+			mesh.draw(lightingShader);
+		}
+		
 		noLightingShader.use();
 		cb->viewPipeline();
 		for (Line& line : lines) {

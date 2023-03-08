@@ -51,7 +51,7 @@ public:
 
 	GPU_Geometry geometry;
 
-	void create(Line l1, Line l2, int sprecision, glm::vec3 col, std::vector<glm::vec3> sweep) {
+	void create(Line l1, Line l2, int sprecision, glm::vec3 col, std::vector<glm::vec3> sweep, glm::vec3 up, glm::vec3 view) {
 
 		verts.clear();
 		indices.clear();
@@ -66,10 +66,10 @@ public:
 			glm::vec3 diameter = Spline1[i] - Spline2[i];
 
 			float scale = 0.5 * glm::length(diameter);
-			float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(glm::vec3{ 0.f, 1.f, 0.f })));
+			float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(up)));
 
-			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ 0, scale, scale });
-			glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, glm::vec3{ 0.f, 0.f, 1.f });
+			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, -scale });
+			glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, view) * glm::rotate(glm::mat4(1.f), -float(M_PI) / 2, up);
 			glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 
 			for (auto j = sweep.begin(); j < sweep.end(); j++) {
