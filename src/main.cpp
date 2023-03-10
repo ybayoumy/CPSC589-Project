@@ -263,6 +263,8 @@ int main() {
 	float ambientStrength = 0.035f;
 	bool simpleWireframe = false;
 	bool inDrawMode = false;
+	bool render = false;
+	bool sweep = false;
 
 	// Set the initial, default values of the shading uniforms.
 	lightingShader.use();
@@ -275,7 +277,11 @@ int main() {
 	std::vector<Line> lines;
 	Line* lineInProgress = nullptr;
 
-	std::vector<std::vector<glm::vec3>> sweeps;
+	glm::vec3 boundColor{ 1.0f, 0.7f, 0.0f };
+	std::vector<Line> bounds;
+	Line* boundInProgress = nullptr;
+
+	std::vector<Line> sweeps;
 	std::vector<glm::vec3> views;
 	std::vector<glm::vec3> ups;
 
@@ -297,7 +303,7 @@ int main() {
 			}
 			else {
 				// create a new line
-				sweeps.push_back(cam.getcircle(16));
+				sweeps.push_back(Line(cam.getcircle(50)));
 				views.push_back(cam.getPos());
 				ups.push_back(cam.getUp());
 
@@ -342,35 +348,23 @@ int main() {
 			cam.theta = 0.f;
 		}
 
-		if (meshes.size() > 0) {
-			ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
-			if (meshchoice > 0) {
+		//if (meshes.size() > 0) {
+			ImGui::SliderInt("Object Select", &meshchoice, 0, 1);
+			//if (meshchoice > 0) {
 				if (lines.size() % 2 != 0) {
 					if (ImGui::Button("Update Sweep")) {
-						sweeps[meshchoice - 1] = lines.back().BSpline(16);
-						meshes.clear();
-						for (int i = 0; i < lines.size()-1; i = i + 2) {
-							meshes.emplace_back();
-							meshInProgress = &meshes.back();
-							meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i], ups[i], views[i]);
-							meshInProgress->updateGPU();
-							meshInProgress = nullptr;
-						}
+						sweeps[meshchoice - 1] = lines.back().BSpline(50);
+						sweep = true;
+						render = true;
 					}
 				}
-			}
-		}
+			//}
+		//}
 
 		if (lines.size() % 2 == 0 && lines.size() != 0) {
 			if (ImGui::Button("Create Rotational Blending Surface")) {
-				meshes.clear();
-				for (int i = 0; i < lines.size(); i = i + 2) {
-					meshes.emplace_back();
-					meshInProgress = &meshes.back();
-					meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i], ups[i], views[i]);
-					meshInProgress->updateGPU();
-					meshInProgress = nullptr;
-				}
+				render = true;
+				sweep = true;
 			}
 		}
 
@@ -378,6 +372,45 @@ int main() {
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::End();
 		ImGui::Render();
+
+		if (sweep) {
+			bounds.emplace_back();
+			boundInProgress = &bounds.back();
+			if (sweep) {
+				sweeps[0].standardizesweep(ups[0], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
+			}
+			for (auto i = sweeps[0].verts.begin(); i < sweeps[0].verts.end(); i++) {
+				boundInProgress->verts.push_back((*i));
+			}
+			boundInProgress->updateGPU();
+			boundInProgress = nullptr;
+			if (lines.size() % 2 != 0) {
+				lines.pop_back();
+			}
+			std::cout << lines.size() << std::endl;
+			sweep = false;
+		}
+
+		if (render) {
+			meshes.clear();
+			for (int i = 0; i < lines.size()-1; i = i + 2) {
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				std::vector<Vertex> axis = centeraxis(lines[i].verts, lines[i + 1].verts, 250);
+				for (auto i = axis.begin(); i < axis.end(); i++) {
+					boundInProgress->verts.push_back(*i);
+				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+				
+				meshes.emplace_back();
+				meshInProgress = &meshes.back();
+				meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i].verts, ups[i], views[i]);
+				meshInProgress->updateGPU();
+				meshInProgress = nullptr;
+			}
+			render = false;
+		}
 
 		if (change) {
 			if (inDrawMode) {
@@ -409,6 +442,9 @@ int main() {
 		cb->viewPipeline();
 		for (Line& line : lines) {
 			line.draw(noLightingShader);
+		}
+		for (Line& bound : bounds) {
+			bound.draw(noLightingShader);
 		}
 
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui

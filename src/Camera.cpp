@@ -1,4 +1,5 @@
 #include "Camera.h"
+#include "Geometry.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -53,16 +54,16 @@ void Camera::incrementR(float dr) {
 	radius -= dr;
 }
 
-std::vector<glm::vec3> Camera::getcircle(int inc) {
+std::vector<Vertex> Camera::getcircle(int inc) {
 	glm::vec3 eye = radius * glm::vec3(std::cos(theta) * std::sin(phi), std::sin(theta), std::cos(theta) * std::cos(phi));
 	glm::vec3 at = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
-	std::vector<glm::vec3> circle;
+	std::vector<Vertex> circle;
 	for (int i = 0; i < inc; i++) {
 		float angle = i * 2 * M_PI / inc;
 		glm::vec3 point = glm::rotate(glm::mat4(1.f), -float(M_PI) / 2, up) * glm::inverse(glm::lookAt(eye, at, up)) * glm::vec4(cos(angle), sin(angle), -radius, 1.f);
-		circle.push_back(point);
+		circle.push_back(Vertex{point, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
 	}
 	return circle;
 }
