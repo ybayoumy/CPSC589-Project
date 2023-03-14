@@ -55,11 +55,12 @@ class Mesh
 public:
 	std::vector<Vertex> verts;
 	std::vector<unsigned int> indices;
+	glm::vec3 direction;
 	glm::vec3 color;
 
 	GPU_Geometry geometry;
 
-	void create(Line l1, Line l2, int sprecision, Line sweep, glm::vec3 up, glm::vec3 view) {
+	void create(Line l1, Line l2, int sprecision, Line sweep, Line pinch1, Line pinch2, glm::vec3 up, glm::vec3 view) {
 
 		verts.clear();
 		indices.clear();
@@ -75,24 +76,51 @@ public:
 			axis.push_back(Vertex{ cvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f) });
 		}
 		
-		for (int i = 0; i <= sprecision; i++) {
-			glm::vec3 cvert = axis[i].position;
-			glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
+		if (pinch1.verts.size() > 0 && pinch2.verts.size() > 0){
+			std::vector<Vertex> PSpline1 = pinch1.BSpline(sprecision);
+			std::vector<Vertex> PSpline2 = pinch2.BSpline(sprecision);
 
-			float scale = 0.5 * glm::length(diameter);
-			float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(up)));
+			for (int i = 0; i <= sprecision; i++) {
+				glm::vec3 cvert = axis[i].position;
+				glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
+				glm::vec3 xdiameter = PSpline1[i].position - PSpline2[i].position;
 
-			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
-			glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, view);
-			glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
+				float xscale = 0.5 * glm::length(xdiameter);
+				std::cout << xscale << std::endl;
+				float scale = 0.5 * glm::length(diameter);
+				float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(up)));
 
-			for (auto j = sweep.verts.begin(); j < sweep.verts.end(); j++) {
-				glm::vec3 point = T * R * S * glm::vec4((*j).position, 1.f);
-				glm::vec3 normal = glm::normalize(point - cvert);
-				verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+				glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ xscale, scale, xscale });
+				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, view);
+				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
+
+				for (auto j = sweep.verts.begin(); j < sweep.verts.end(); j++) {
+					glm::vec3 point = T * R * S * glm::vec4((*j).position, 1.f);
+					glm::vec3 normal = glm::normalize(point - cvert);
+					verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+				}
 			}
 		}
+		else {
+			for (int i = 0; i <= sprecision; i++) {
+				glm::vec3 cvert = axis[i].position;
+				glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
 
+				float scale = 0.5 * glm::length(diameter);
+				float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(up)));
+
+				glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
+				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, view);
+				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
+
+				for (auto j = sweep.verts.begin(); j < sweep.verts.end(); j++) {
+					glm::vec3 point = T * R * S * glm::vec4((*j).position, 1.f);
+					glm::vec3 normal = glm::normalize(point - cvert);
+					verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+				}
+			}
+		}
+		
 		// creating faces using vertex indices
 		for (int i = 1; i <= sweep.verts.size(); i++) {
 			for (int j = 0; j <= sprecision; j++) {

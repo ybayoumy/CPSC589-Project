@@ -19,7 +19,7 @@
 #include "ShaderProgram.h"
 #include "Shader.h"
 #include "Camera.h"
-#include "Mesh.h";
+#include "Mesh.h"
 #include "Line.h";
 
 #include "glm/glm.hpp"
@@ -280,10 +280,18 @@ int main() {
 	glm::vec3 boundColor{ 1.0f, 0.7f, 0.0f };
 	std::vector<Line> bounds;
 	Line* boundInProgress = nullptr;
+	
+	std::vector<Line> pinch;
+	pinch.push_back(Line());
+	pinch.push_back(Line());
 
 	std::vector<Line> sweeps;
+
 	std::vector<glm::vec3> views;
 	std::vector<glm::vec3> ups;
+
+	std::vector<glm::vec3> direction;
+	bool XZ = false;
 
 	int meshchoice = 0;
 
@@ -303,12 +311,11 @@ int main() {
 			}
 			else {
 				// create a new line
+				lines.emplace_back(std::vector<Vertex>{newPoint});
+				lineInProgress = &lines.back();
 				sweeps.push_back(Line(cam.getcircle(50)));
 				views.push_back(cam.getPos());
 				ups.push_back(cam.getUp());
-
-				lines.emplace_back(std::vector<Vertex>{newPoint});
-				lineInProgress = &lines.back();
 			}
 			lineInProgress->updateGPU();
 		}
@@ -340,31 +347,44 @@ int main() {
 
 		if (ImGui::Button("View XZ Plane")) {
 			cam.phi = 0.f;
-			cam.theta = M_PI / 2;
+			cam.theta = M_PI_2-0.0001f;
 		}
 
 		if (ImGui::Button("View ZY Plane")) {
-			cam.phi = M_PI / 2;
+			cam.phi = M_PI_2;
 			cam.theta = 0.f;
 		}
 
-		//if (meshes.size() > 0) {
-			ImGui::SliderInt("Object Select", &meshchoice, 0, 1);
-			//if (meshchoice > 0) {
-				if (lines.size() % 2 != 0) {
-					if (ImGui::Button("Update Sweep")) {
-						sweeps[meshchoice - 1] = lines.back().BSpline(50);
-						sweep = true;
-						render = true;
-					}
-				}
-			//}
-		//}
+		if (meshes.size() > 0) {
+			ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
+		}
+
+		if (lines.size() % 2 != 0) {
+			if (ImGui::Button("Update Sweep") && meshchoice != 0) {
+				sweeps[2*(meshchoice - 1)] = lines.back().verts;
+				lines.pop_back();
+				sweep = true;
+				render = true;
+			}
+		}
+		
+		if (ImGui::Button("Update Pinch")) {
+
+			pinch[2*(meshchoice - 1)] = lines.back().verts;
+			lines.pop_back();
+			pinch[2*(meshchoice - 1) + 1] = lines.back().verts;
+			lines.pop_back();
+			sweep = true;
+			render = true;
+		}
 
 		if (lines.size() % 2 == 0 && lines.size() != 0) {
 			if (ImGui::Button("Create Rotational Blending Surface")) {
 				render = true;
 				sweep = true;
+
+				pinch.emplace_back();
+				pinch.emplace_back();
 			}
 		}
 
@@ -376,18 +396,26 @@ int main() {
 		if (sweep) {
 			bounds.emplace_back();
 			boundInProgress = &bounds.back();
-			if (sweep) {
-				sweeps[0].standardizesweep(ups[0], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
+
+			if (meshchoice == 0) {
+				if (sweep) {
+					sweeps[0].standardizesweep(ups[0], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
+				}
+				for (auto i = sweeps[0].verts.begin(); i < sweeps[0].verts.end(); i++) {
+					boundInProgress->verts.push_back((*i));
+				}
 			}
-			for (auto i = sweeps[0].verts.begin(); i < sweeps[0].verts.end(); i++) {
-				boundInProgress->verts.push_back((*i));
+			else {
+				if (sweep) {
+					sweeps[2 * (meshchoice - 1)].standardizesweep(ups[2 * (meshchoice - 1)], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
+				}
+				for (auto i = sweeps[2 * (meshchoice - 1)].verts.begin(); i < sweeps[2 * (meshchoice - 1)].verts.end(); i++) {
+					boundInProgress->verts.push_back((*i));
+				}
 			}
+
 			boundInProgress->updateGPU();
 			boundInProgress = nullptr;
-			if (lines.size() % 2 != 0) {
-				lines.pop_back();
-			}
-			std::cout << lines.size() << std::endl;
 			sweep = false;
 		}
 
@@ -405,7 +433,7 @@ int main() {
 				
 				meshes.emplace_back();
 				meshInProgress = &meshes.back();
-				meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i].verts, ups[i], views[i]);
+				meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i].verts, pinch[i].verts, pinch[i+1].verts, ups[i], views[i]);
 				meshInProgress->updateGPU();
 				meshInProgress = nullptr;
 			}

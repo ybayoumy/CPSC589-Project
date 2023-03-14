@@ -24,9 +24,7 @@ glm::vec3 Camera::getPos() {
 }
 
 glm::vec3 Camera::getUp() {
-	glm::vec3 eye = radius * glm::vec3(std::cos(theta) * std::sin(phi), std::sin(theta), std::cos(theta) * std::cos(phi));
-	if (eye == glm::vec3(0.f, radius, 0.f)) return glm::vec3(1.f, 0.f, 0.f);
-	else return glm::vec3(0.f, radius, 0.f);
+	return glm::normalize(glm::vec3(-std::sin(phi) * std::sin(theta), std::cos(theta), std::cos(phi) * std::sin(theta)));
 }
 
 void Camera::incrementTheta(float dt) {
@@ -57,7 +55,11 @@ void Camera::incrementR(float dr) {
 std::vector<Vertex> Camera::getcircle(int inc) {
 	glm::vec3 eye = radius * glm::vec3(std::cos(theta) * std::sin(phi), std::sin(theta), std::cos(theta) * std::cos(phi));
 	glm::vec3 at = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::vec3 up = getUp();
+
+	std::cout << up.x << std::endl;
+	std::cout << up.y << std::endl;
+	std::cout << up.z << std::endl;
 
 	std::vector<Vertex> circle;
 	for (int i = 0; i < inc; i++) {
