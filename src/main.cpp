@@ -362,7 +362,7 @@ int main() {
 				lines.pop_back();
 				meshes[meshchoice - 1].create(75);
 				meshes[meshchoice - 1].updateGPU();
-
+				
 				bounds.emplace_back();
 				boundInProgress = &bounds.back();
 				for (auto i = (meshes[meshchoice - 1].sweep).verts.begin(); i < (meshes[meshchoice - 1].sweep).verts.end(); i++) {
@@ -370,9 +370,6 @@ int main() {
 				}
 				boundInProgress->updateGPU();
 				boundInProgress = nullptr;
-
-				//sweep = true;
-				//render = true;
 			}
 		}
 		
@@ -462,27 +459,6 @@ int main() {
 			boundInProgress = nullptr;
 			sweep = false;
 		}*/
-
-		if (render) {
-			/*shes.clear();
-			for ( i = 0; i < lines.size()-1; i = i + 2) {
-				/*bounds.emplace_back();
-				boundInProgress = &bounds.back();
-				std::vector<Vertex> axis = centeraxis(lines[i].verts, lines[i + 1].verts, 250);
-				for (auto i = axis.begin(); i < axis.end(); i++) {
-					boundInProgress->verts.push_back(*i);
-				}
-				boundInProgress->updateGPU();
-				boundInProgress = nullptr;
-				*/
-			/*	meshes.emplace_back();
-				meshInProgress = &meshes.back();
-				meshInProgress->create(75);
-				meshInProgress->updateGPU();
-				meshInProgress = nullptr;
-			}*/
-			render = false;
-		}
 
 		if (change) {
 			if (inDrawMode) {
