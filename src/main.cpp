@@ -313,9 +313,6 @@ int main() {
 				// create a new line
 				lines.emplace_back(std::vector<Vertex>{newPoint});
 				lineInProgress = &lines.back();
-				sweeps.push_back(Line(cam.getcircle(50)));
-				views.push_back(cam.getPos());
-				ups.push_back(cam.getUp());
 			}
 			lineInProgress->updateGPU();
 		}
@@ -359,12 +356,23 @@ int main() {
 			ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
 		}
 
-		if (lines.size() % 2 != 0) {
+		if (lines.size() % 2 != 0 && lines.size() != 0) {
 			if (ImGui::Button("Update Sweep") && meshchoice != 0) {
-				sweeps[2*(meshchoice - 1)] = lines.back().verts;
+				meshes[meshchoice - 1].sweep = meshes[meshchoice - 1].cam.standardize(lines.back().verts);
 				lines.pop_back();
-				sweep = true;
-				render = true;
+				meshes[meshchoice - 1].create(75);
+				meshes[meshchoice - 1].updateGPU();
+
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				for (auto i = (meshes[meshchoice - 1].sweep).verts.begin(); i < (meshes[meshchoice - 1].sweep).verts.end(); i++) {
+					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				//sweep = true;
+				//render = true;
 			}
 		}
 		
@@ -374,17 +382,53 @@ int main() {
 			lines.pop_back();
 			pinch[2*(meshchoice - 1) + 1] = lines.back().verts;
 			lines.pop_back();
-			sweep = true;
-			render = true;
+			//sweep = true;
+			//render = true;
+		}
+
+		if (meshes.size() > 0) {
+			ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
 		}
 
 		if (lines.size() % 2 == 0 && lines.size() != 0) {
 			if (ImGui::Button("Create Rotational Blending Surface")) {
-				render = true;
-				sweep = true;
+				meshes.emplace_back();
+				meshInProgress = &meshes.back();
+				meshInProgress->bound1 = lines.back().verts;
+				lines.pop_back();
+				meshInProgress->bound2 = lines.back().verts;
+				lines.pop_back();
+				meshInProgress->sweep = cam.getcircle(50);
+				meshInProgress->cam = cam;
+				meshInProgress->create(75);
+				meshInProgress->updateGPU();
 
-				pinch.emplace_back();
-				pinch.emplace_back();
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				for (auto i = (meshInProgress->bound1).verts.begin(); i < (meshInProgress->bound1).verts.end(); i++) {
+					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				for (auto i = (meshInProgress->bound2).verts.begin(); i < (meshInProgress->bound2).verts.end(); i++) {
+					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				for (auto i = (meshInProgress->sweep).verts.begin(); i < (meshInProgress->sweep).verts.end(); i++) {
+					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				meshInProgress = nullptr;
+				render = true;
 			}
 		}
 
@@ -393,7 +437,7 @@ int main() {
 		ImGui::End();
 		ImGui::Render();
 
-		if (sweep) {
+		/*if (sweep) {
 			bounds.emplace_back();
 			boundInProgress = &bounds.back();
 
@@ -417,12 +461,12 @@ int main() {
 			boundInProgress->updateGPU();
 			boundInProgress = nullptr;
 			sweep = false;
-		}
+		}*/
 
 		if (render) {
-			meshes.clear();
-			for (int i = 0; i < lines.size()-1; i = i + 2) {
-				bounds.emplace_back();
+			/*shes.clear();
+			for ( i = 0; i < lines.size()-1; i = i + 2) {
+				/*bounds.emplace_back();
 				boundInProgress = &bounds.back();
 				std::vector<Vertex> axis = centeraxis(lines[i].verts, lines[i + 1].verts, 250);
 				for (auto i = axis.begin(); i < axis.end(); i++) {
@@ -430,13 +474,13 @@ int main() {
 				}
 				boundInProgress->updateGPU();
 				boundInProgress = nullptr;
-				
-				meshes.emplace_back();
+				*/
+			/*	meshes.emplace_back();
 				meshInProgress = &meshes.back();
-				meshInProgress->create(lines[i].verts, lines[i + 1].verts, 250, sweeps[i].verts, pinch[i].verts, pinch[i+1].verts, ups[i], views[i]);
+				meshInProgress->create(75);
 				meshInProgress->updateGPU();
 				meshInProgress = nullptr;
-			}
+			}*/
 			render = false;
 		}
 

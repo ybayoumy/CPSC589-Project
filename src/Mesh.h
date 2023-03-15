@@ -9,6 +9,7 @@
 #include "Geometry.h"
 #include "ShaderProgram.h"
 #include "Line.h"
+#include "Camera.h"
 
 void orderlines(std::vector<Vertex>& Line1, std::vector<Vertex>& Line2) {
 	float dist1 = glm::distance(Line1[0].position, Line2[0].position);
@@ -55,19 +56,31 @@ class Mesh
 public:
 	std::vector<Vertex> verts;
 	std::vector<unsigned int> indices;
+
+	Line bound1;
+	Line bound2;
+
+	Line sweep;
+
+	Line pinch1;
+	Line pinch2;
+
 	glm::vec3 direction;
 	glm::vec3 color;
+	glm::vec3 updirection;
+
+	Camera cam;
 
 	GPU_Geometry geometry;
 
-	void create(Line l1, Line l2, int sprecision, Line sweep, Line pinch1, Line pinch2, glm::vec3 up, glm::vec3 view) {
+	void create(int sprecision) {
 
 		verts.clear();
 		indices.clear();
 
 		std::vector<Vertex> axis;
-		std::vector<Vertex> Spline1 = l1.BSpline(sprecision);
-		std::vector<Vertex> Spline2 = l2.BSpline(sprecision);
+		std::vector<Vertex> Spline1 = bound1.BSpline(sprecision);
+		std::vector<Vertex> Spline2 = bound2.BSpline(sprecision);
 
 		orderlines(Spline1, Spline2);
 
@@ -75,7 +88,7 @@ public:
 			glm::vec3 cvert = 0.5f * Spline1[i].position + 0.5f * Spline2[i].position;
 			axis.push_back(Vertex{ cvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f) });
 		}
-		
+
 		if (pinch1.verts.size() > 0 && pinch2.verts.size() > 0){
 			std::vector<Vertex> PSpline1 = pinch1.BSpline(sprecision);
 			std::vector<Vertex> PSpline2 = pinch2.BSpline(sprecision);
@@ -88,10 +101,10 @@ public:
 				float xscale = 0.5 * glm::length(xdiameter);
 				std::cout << xscale << std::endl;
 				float scale = 0.5 * glm::length(diameter);
-				float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(up)));
+				float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(cam.getUp())));
 
 				glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ xscale, scale, xscale });
-				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, view);
+				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, cam.getPos());
 				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 
 				for (auto j = sweep.verts.begin(); j < sweep.verts.end(); j++) {
@@ -107,10 +120,10 @@ public:
 				glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
 
 				float scale = 0.5 * glm::length(diameter);
-				float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(up)));
+				float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(cam.getUp())));
 
 				glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
-				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, view);
+				glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
 				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 
 				for (auto j = sweep.verts.begin(); j < sweep.verts.end(); j++) {
@@ -169,15 +182,27 @@ public:
 		color = col;
 	}
 
-	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i)
+	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)
 		: verts(v)
 		, indices(i)
 		, color(glm::vec3(1.f, 0.f, 0.f))
+		, bound1()
+		, bound2()
+		, sweep()
+		, pinch1()
+		, pinch2()
+		, cam(c)
 	{}
 
 	Mesh()
 		: verts()
 		, indices()
 		, color(glm::vec3(1.f, 0.f, 0.f))
+		, bound1()
+		, bound2()
+		, sweep()
+		, pinch1()
+		, pinch2()
+		, cam(0, 0, 1)
 	{}
 };
