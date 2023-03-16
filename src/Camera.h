@@ -21,7 +21,7 @@ public:
 	glm::vec3 getUp();
 	std::vector<Vertex> getcircle(int inc);
 	std::vector<Vertex> standardize(std::vector<Vertex>);
-
+	
 	void incrementTheta(float dt);
 	void incrementPhi(float dp);
 	void incrementR(float dr);

@@ -293,6 +293,8 @@ int main() {
 	std::vector<glm::vec3> direction;
 	bool XZ = false;
 
+	bool showbounds = true;
+
 	int meshchoice = 0;
 
 	// RENDER LOOP
@@ -336,6 +338,7 @@ int main() {
 		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
 		change |= ImGui::Checkbox("Simple wireframe", &simpleWireframe);
 		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
+		ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
 
 		if (ImGui::Button("View XY Plane")) {
 			cam.phi = 0.f;
@@ -372,19 +375,21 @@ int main() {
 				boundInProgress = nullptr;
 			}
 		}
-		
-		if (ImGui::Button("Update Pinch")) {
 
-			pinch[2*(meshchoice - 1)] = lines.back().verts;
-			lines.pop_back();
-			pinch[2*(meshchoice - 1) + 1] = lines.back().verts;
-			lines.pop_back();
-			//sweep = true;
-			//render = true;
-		}
+		if (lines.size() % 2 == 0 && lines.size() != 0) {
+			if (ImGui::Button("Update Pinch") && meshchoice != 0) {
 
-		if (meshes.size() > 0) {
-			ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
+				meshes[meshchoice - 1].pinch1 = lines.back().verts;
+				lines.pop_back();
+				meshes[meshchoice - 1].pinch2 = lines.back().verts;
+				lines.pop_back();
+				meshes[meshchoice - 1].create(75);
+				meshes[meshchoice - 1].updateGPU();
+
+
+				//sweep = true;
+				//render = true;
+			}
 		}
 
 		if (lines.size() % 2 == 0 && lines.size() != 0) {
@@ -491,8 +496,10 @@ int main() {
 		for (Line& line : lines) {
 			line.draw(noLightingShader);
 		}
-		for (Line& bound : bounds) {
-			bound.draw(noLightingShader);
+		if (showbounds) {
+			for (Line& bound : bounds) {
+				bound.draw(noLightingShader);
+			}
 		}
 
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui

@@ -93,22 +93,40 @@ public:
 			std::vector<Vertex> PSpline1 = pinch1.BSpline(sprecision);
 			std::vector<Vertex> PSpline2 = pinch2.BSpline(sprecision);
 
+			orderlines(PSpline1, PSpline2);
+
+			glm::vec3 eye = cam.getPos();
+			glm::vec3 at = glm::vec3(0.f, 0.f, 0.f);
+
+			glm::mat4 UnRot = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, cam.radius)) * glm::lookAt(eye, at, glm::vec3(0.f, 1.f, 0.f)) * glm::rotate(glm::mat4(1.f), -float(M_PI_2), cam.getUp());
+
 			for (int i = 0; i <= sprecision; i++) {
 				glm::vec3 cvert = axis[i].position;
 				glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
 				glm::vec3 xdiameter = PSpline1[i].position - PSpline2[i].position;
 
 				float xscale = 0.5 * glm::length(xdiameter);
-				std::cout << xscale << std::endl;
 				float scale = 0.5 * glm::length(diameter);
+
+				float pratio = xscale / scale;
+
 				float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(cam.getUp())));
 
-				glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ xscale, scale, xscale });
+				glm::mat4 PScale = glm::scale(glm::mat4(1.f), glm::vec3(pratio, 1, pratio));
+
+				glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{scale, scale, scale});
 				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, cam.getPos());
 				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 
 				for (auto j = sweep.verts.begin(); j < sweep.verts.end(); j++) {
-					glm::vec3 point = T * R * S * glm::vec4((*j).position, 1.f);
+					//glm::vec3 point = T * R * S * glm::inverse(UnRot) * PScale * 
+					// obtain standardized sweep
+					glm::vec3 point = UnRot * glm::vec4((*j).position, 1.f);
+					// return to position, move to rotational blending surface
+					point = T * R * S * glm::inverse(UnRot) * PScale * glm::vec4(point, 1.f);
+
+					//std::cout << point << std::endl;
+
 					glm::vec3 normal = glm::normalize(point - cvert);
 					verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
 				}
