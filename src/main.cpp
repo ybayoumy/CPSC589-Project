@@ -28,31 +28,6 @@
 std::vector<glm::vec3> listOfMouseLocations;
 std::vector<glm::vec3> listOfChaikinPoints;
 
-std::vector<glm::vec3> reverseChaikinAlgorithm(std::vector<glm::vec3> mousePoints) {
-	double xj, yj;
-	std::vector<glm::vec3> Chaikin;
-	for (int i = 0; i < mousePoints.size(); i += 3) {
-		xj = 0;
-		yj = 0;
-		if ((0 <= (i - 1)) && ((i - 1) <= mousePoints.size())) {
-			xj -= 0.25 * mousePoints[i - 1].x;
-			yj -= 0.25 * mousePoints[i - 1].y;
-		}
-		xj += 0.75 * mousePoints[i].x;
-		yj += 0.75 * mousePoints[i].y;
-		if ((0 <= (i + 1)) && ((i + 1) <= mousePoints.size())) {
-			xj += 0.75 * mousePoints[i + 1].x;
-			yj += 0.75 * mousePoints[i + 1].y;
-		}
-		if ((0 <= (i + 2)) && ((i + 2) <= mousePoints.size())) {
-			xj -= 0.25 * mousePoints[i + 2].x;
-			yj -= 0.25 * mousePoints[i + 2].y;
-		}
-		Chaikin.push_back(glm::vec3(xj, yj, 0));
-	}
-	return Chaikin;
-}
-
 Mesh unitSphere(int granularity, glm::vec3 col) {
 	float angleStep = M_PI / granularity;
 
@@ -93,6 +68,32 @@ Mesh unitSphere(int granularity, glm::vec3 col) {
 class Callbacks3D : public CallbackInterface {
 
 public:
+
+	std::vector<glm::vec3> reverseChaikinAlgorithm(std::vector<glm::vec3> mousePoints) {
+		double xj, yj;
+		std::vector<glm::vec3> Chaikin;
+		for (int i = 0; i < mousePoints.size(); i += 3) {
+			xj = 0;
+			yj = 0;
+			if ((0 <= (i - 1)) && ((i - 1) <= mousePoints.size())) {
+				xj -= 0.25 * mousePoints[i - 1].x;
+				yj -= 0.25 * mousePoints[i - 1].y;
+			}
+			xj += 0.75 * mousePoints[i].x;
+			yj += 0.75 * mousePoints[i].y;
+			if ((0 <= (i + 1)) && ((i + 1) <= mousePoints.size())) {
+				xj += 0.75 * mousePoints[i + 1].x;
+				yj += 0.75 * mousePoints[i + 1].y;
+			}
+			if ((0 <= (i + 2)) && ((i + 2) <= mousePoints.size())) {
+				xj -= 0.25 * mousePoints[i + 2].x;
+				yj -= 0.25 * mousePoints[i + 2].y;
+			}
+			Chaikin.push_back(glm::vec3(xj, yj, 0));
+		}
+		return Chaikin;
+	}
+
 	// Constructor. We use values of -1 for attributes that, at the start of
 	// the program, have no meaningful/"true" value.
 	Callbacks3D(ShaderProgram& shader, Camera& camera, int screenWidth, int screenHeight)
@@ -147,11 +148,20 @@ public:
 			camera.incrementTheta(ypos - mouseOldY);
 			camera.incrementPhi(xpos - mouseOldX);
 		}
-		if (leftMouseDown) {
+		if (leftMouseDown && ((xpos != mouseOldX)||(ypos != mouseOldY))) {
+			std::cout << "X: " << xpos << "Y: " << ypos << std::endl;
 			listOfMouseLocations.push_back(glm::vec3(xpos, ypos, 0));
+			mouseOldX = xpos;
+			mouseOldY = ypos;
 		}
-		mouseOldX = xpos;
-		mouseOldY = ypos;
+		else if (!listOfMouseLocations.empty()) {
+			listOfMouseLocations = reverseChaikinAlgorithm(listOfMouseLocations);
+			for (int i = 0; i < listOfMouseLocations.size(); i++) {
+				listOfChaikinPoints.push_back(listOfMouseLocations[i]);
+			}
+			listOfMouseLocations.clear();
+
+		}
 	}
 	virtual void scrollCallback(double xoffset, double yoffset) {
 		camera.incrementR(yoffset);
