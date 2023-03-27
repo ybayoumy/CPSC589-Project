@@ -237,6 +237,24 @@ std::vector<glm::vec3> makecircle(glm::vec3 up, glm::vec2 cam) {
 	return unitcircle;
 }
 
+std::vector<Line> generateAxisLines() {
+	std::vector<Line> axisLines;
+
+	Vertex xPositive{ glm::vec3(50.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f) };
+	Vertex xNegative{ glm::vec3(-50.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{ xNegative, xPositive });
+
+	Vertex yPositive{ glm::vec3(0.0f, 50.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f) };
+	Vertex yNegative{ glm::vec3(0.0f, -50.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{ yNegative, yPositive });
+
+	Vertex zPositive{ glm::vec3(0.0f, 0.0f, 50.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	Vertex zNegative{ glm::vec3(0.0f, 0.0f, -50.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{ zNegative, zPositive });
+
+	return axisLines;
+}
+
 int main() {
 	Log::debug("Starting main");
 
@@ -262,6 +280,7 @@ int main() {
 	glm::vec3 lightCol(1.f);
 	float ambientStrength = 0.035f;
 
+	bool showAxes = true;
 	bool simpleWireframe = false;
 	bool inDrawMode = true;
 	bool showbounds = true;
@@ -270,6 +289,11 @@ int main() {
 	// Set the initial, default values of the shading uniforms.
 	lightingShader.use();
 	cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
+
+	std::vector<Line> axisLines = generateAxisLines();
+	for (Line& line : axisLines) {
+		line.updateGPU();
+	}
 
 	std::vector<Mesh> meshes;
 	Mesh* meshInProgress = nullptr;
@@ -337,8 +361,9 @@ int main() {
 		//change |= ImGui::DragFloat3("Light's position", glm::value_ptr(lightPos));
 		//change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
 		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
-		change |= ImGui::Checkbox("Simple wireframe", &simpleWireframe);
 		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
+		change |= ImGui::Checkbox("Show Axes", &showAxes);
+		change |= ImGui::Checkbox("Show Wireframe", &simpleWireframe);
 		change |= ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
 
 		if (inDrawMode) {
@@ -355,7 +380,6 @@ int main() {
 				cam.theta = 0.f;
 			}
 		}
-
 
 		//if (meshes.size() > 0) {
 		//	ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
@@ -482,6 +506,15 @@ int main() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glEnable(GL_DEPTH_TEST);
 		glPolygonMode(GL_FRONT_AND_BACK, (simpleWireframe ? GL_LINE : GL_FILL) );
+
+		// Drawing Axis Lines (no Lighting)
+		if (showAxes) {
+			noLightingShader.use();
+			cb->viewPipeline();
+			for (Line& line : axisLines) {
+				line.draw(noLightingShader);
+			}
+		}
 
 		// Drawing Meshes (with Lighting)
 		lightingShader.use();
