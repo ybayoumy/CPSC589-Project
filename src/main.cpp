@@ -301,6 +301,7 @@ int main() {
 	glm::vec3 lineColor{ 0.0f, 1.0f, 0.0f };
 	std::vector<Line> lines;
 	Line* lineInProgress = nullptr;
+	float pointEpsilon = 0.01f;
 
 	glm::vec3 boundColor{ 1.0f, 0.7f, 0.0f };
 	std::vector<Line> bounds;
@@ -330,15 +331,24 @@ int main() {
 			glm::vec4 cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
 			cursorPos = glm::inverse(cam.getView()) * cursorPos;
 
-			Vertex newPoint = Vertex{ cursorPos, lineColor, glm::vec3(0.0f) };
 			if (lineInProgress) {
-				// add point to line in progress
-				lineInProgress->verts.push_back(newPoint);
+				// add points to line in progress
+				Vertex lastVertex = lineInProgress->verts.back();
+				glm::vec3 slope = glm::vec3(cursorPos) - lastVertex.position;
+				float pointDistance = glm::length(slope);
+				slope = glm::normalize(slope);
+
+				for (float dist = pointEpsilon; dist <= pointDistance; dist += pointEpsilon)
+				{
+					Vertex newPoint = Vertex{ lastVertex.position + slope * dist, lineColor, glm::vec3(0.0f) };
+					lineInProgress->verts.push_back(newPoint);
+				}
+
 				lineInProgress->updateGPU();
 			}
-			else if (lines.size() < 2){
+			else if (lines.size() < 2){ 
 				// create a new line
-				lines.emplace_back(std::vector<Vertex>{newPoint});
+				lines.emplace_back(std::vector<Vertex>{ Vertex{ cursorPos, lineColor, glm::vec3(0.0f) } });
 				lineInProgress = &lines.back();
 				lineInProgress->updateGPU();
 			}
