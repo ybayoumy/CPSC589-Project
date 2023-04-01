@@ -129,7 +129,12 @@ public:
 		//}
 		//else {
 		for (int i = 0; i <= sprecision; i++) {
+
 			glm::vec3 cvert = 0.5f * Spline1[i].position + 0.5f * Spline2[i].position;
+			if (i == 0) {
+				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
+			}
+
 			glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
 
 			float scale = 0.5 * glm::length(diameter);
@@ -144,38 +149,68 @@ public:
 				glm::vec3 normal = glm::normalize(point - cvert);
 				verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
 			}
+
+			if (i == sprecision) {
+				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
+			}
+		
 		}
 		//}
 		
+		for (int i = 1; i <= sweep.verts.size(); i++) {
+			if (i == sweep.verts.size()) {
+				indices.push_back(0 + 1);
+				indices.push_back(0);
+				indices.push_back(i);
+			}
+			else {
+				indices.push_back(i + 1);
+				indices.push_back(0);
+				indices.push_back(i);
+			}	
+		}
+
 		// creating faces using vertex indices
 		for (int i = 1; i <= sweep.verts.size(); i++) {
 			for (int j = 0; j <= sprecision; j++) {
 				if (i != sweep.verts.size()) {
 					if (j != 0) {
-						indices.push_back((sweep.verts.size()) * j + i);
-						indices.push_back((sweep.verts.size()) * (j - 1) + i);
-						indices.push_back((sweep.verts.size()) * j + i - 1);
+						indices.push_back((sweep.verts.size()) * j + i + 1);
+						indices.push_back((sweep.verts.size()) * (j - 1) + i + 1);
+						indices.push_back((sweep.verts.size()) * j + i - 1 + 1);
 					}
 					if (j != sprecision) {
-						indices.push_back((sweep.verts.size()) * j + i);
-						indices.push_back((sweep.verts.size()) * j + i - 1);
-						indices.push_back((sweep.verts.size()) * (j + 1) + i - 1);
+						indices.push_back((sweep.verts.size()) * j + i + 1);
+						indices.push_back((sweep.verts.size()) * j + i - 1 + 1);
+						indices.push_back((sweep.verts.size()) * (j + 1) + i - 1 + 1);
 					}
 				}
 				else {
 					if (j != 0) {
-						indices.push_back((sweep.verts.size()) * (j) + 0);
-						indices.push_back((sweep.verts.size()) * (j - 1) + 0);
-						indices.push_back((sweep.verts.size()) * (j) + sweep.verts.size() - 1);
+						indices.push_back((sweep.verts.size()) * (j) + 0 + 1);
+						indices.push_back((sweep.verts.size()) * (j - 1) + 0 + 1);
+						indices.push_back((sweep.verts.size()) * (j) + sweep.verts.size() - 1 + 1);
 					}
 					if (j != sprecision) {
-						indices.push_back((sweep.verts.size()) * j + 0);
-						indices.push_back((sweep.verts.size()) * j + sweep.verts.size() - 1);
-						indices.push_back((sweep.verts.size()) * (j + 1) + sweep.verts.size() - 1);
+						indices.push_back((sweep.verts.size()) * j + 0 + 1);
+						indices.push_back((sweep.verts.size()) * j + sweep.verts.size() - 1 + 1);
+						indices.push_back((sweep.verts.size()) * (j + 1) + sweep.verts.size() - 1 + 1);
 					}
 				}
 			}
 		}
+
+		for (int i = 1; i <= sweep.verts.size(); i++) {
+			indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 1));
+			indices.push_back(sweep.verts.size() * (sprecision + 1) + 1);
+			indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 2));
+			if (i == sweep.verts.size()) {
+				indices.push_back(sweep.verts.size() * (sprecision + 1) - 0);
+				indices.push_back(sweep.verts.size() * (sprecision + 1) + 1);
+				indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 1));
+			}
+		}
+
 	}
 
 	void draw(ShaderProgram& shader) {
