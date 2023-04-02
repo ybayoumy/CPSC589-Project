@@ -51,12 +51,12 @@ std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
 	return axis;
 }
 
-glm::vec3 closestvec(std::vector<Vertex> points, glm::vec3 point) {
+glm::vec3 closestvec(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
 	glm::vec3 closest;
 	float min = 10.f;
 
 	for (auto i = points.begin(); i < points.end(); i++) {
-		float distance = fabs((*i).position.y - point.y);
+		float distance = glm::distance(ref * (*i).position, ref * point);
 		if (distance < min) {
 			closest = (*i).position;
 			min = distance;
@@ -72,6 +72,9 @@ public:
 	std::vector<unsigned int> indices;
 
 	glm::vec3 color;
+	glm::vec3 fixed;
+	glm::vec3 unfixed;
+	glm::vec3 up;
 
 	Line bound1;
 	Line bound2;
@@ -82,9 +85,6 @@ public:
 
 	Line pinch1;
 	Line pinch2;
-
-	//glm::vec3 direction;
-	//glm::vec3 updirection;
 
 	Camera cam;
 
@@ -97,6 +97,9 @@ public:
 
 		std::vector<Vertex> Spline1 = bound1.BSpline(sprecision);
 		std::vector<Vertex> Spline2 = bound2.BSpline(sprecision);
+
+		fixed = glm::vec3(1.f) - glm::normalize(glm::abs(cam.getPos()));
+		unfixed = glm::normalize(glm::vec3(cam.getPos().x, cam.getPos().y, -cam.getPos().z));
 
 		orderlines(Spline1, Spline2);
 
@@ -161,15 +164,16 @@ public:
 			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
 
 			if (pinch1.verts.size() > 0 && pinch2.verts.size() > 0) {
-				glm::vec3 P1 = closestvec(pinch1.verts, cvert);
-				glm::vec3 P2 = closestvec(pinch2.verts, cvert);
+				glm::vec3 P1 = closestvec(pinch1.verts, cvert, up);
+				glm::vec3 P2 = closestvec(pinch2.verts, cvert, up);
 				glm::vec3 pdiameter = P2 - P1;
 
+				cvert = (cvert * fixed) + ((0.5f * (P1 + P2)) * glm::abs(unfixed));
+	
 				float pscale = 0.5 * glm::length(pdiameter);
+				glm::vec3 scaleby = pscale * unfixed + scale * fixed;
 
-				std::cout << pscale << std::endl;
-
-				S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, -pscale });
+				S = glm::scale(glm::mat4(1.f), scaleby);
 			}
 
 			glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
@@ -266,23 +270,32 @@ public:
 		return glm::normalize(avgaxis);
 	}
 
-	glm::vec3 getPoint() {
-		float t = (0 - axis[0].position.y) / (getAxis().y);
+	glm::vec3 getPoint(glm::vec3 fix) {
+		glm::vec3 y = fix * axis[0].position;
+		glm::vec3 m = fix * getAxis();
+
+		float t = (-(y.x + y.y + y.z)) / (m.x + m.y + m.z);
 		glm::vec3 point = getAxis() * t + axis[0].position;
 		return point;
 	}
 
-	void setPinch(int sprecision) {
+	void setPinch(int sprecision, glm::vec3 current) {
+
 		std::vector<Vertex> P1 = pinch1.BSpline(sprecision);
 		std::vector<Vertex> P2 = pinch2.BSpline(sprecision);
+
+		glm::vec3 nochange = fixed - glm::normalize(glm::abs(current));
+
+		glm::vec3 drawaxis = getAxis();
+		glm::vec3 axisstart = getPoint(nochange);
 
 		orderlines(P1, P2);
 
 		glm::vec3 center = 0.25f * (P1[0].position + P2[0].position + P1.back().position + P2.back().position);
 		glm::vec3 newcenter = 0.5f * (axis[0].position + axis.back().position);
 
-		float height = fabs(glm::vec3(0.5f * (P1[0].position + P2[0].position)).y - glm::vec3(0.5f * (P1.back().position + P2.back().position)).y);
-		float newheight = fabs(axis[0].position.y - axis.back().position.y);
+		float height = glm::distance(nochange * glm::vec3(0.5f * (P1[0].position + P2[0].position)), nochange * glm::vec3(0.5f * (P1.back().position + P2.back().position)));
+		float newheight = glm::distance(nochange * axis[0].position, nochange * axis.back().position);
 		float scale = newheight / height;
 
 		for (int i = 0; i <= sprecision; i++) {
@@ -292,6 +305,25 @@ public:
 
 		pinch1 = P1;
 		pinch2 = P2;
+
+		glm::vec3 toline = glm::abs(glm::normalize(current) - nochange);
+
+		for (auto i = pinch1.verts.begin(); i < pinch1.verts.end(); i++) {
+			glm::vec3 y = nochange * (*i).position;
+			glm::vec3 m = nochange * drawaxis;
+
+			float t = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+			(*i).position = ((glm::vec3(1.f) - toline) * (*i).position) + (toline * (axisstart + drawaxis * t));
+		}
+		for (auto j = pinch2.verts.begin(); j < pinch2.verts.end(); j++) {
+			glm::vec3 y = nochange * (*j).position;
+			glm::vec3 m = nochange * drawaxis;
+
+			float s = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+			(*j).position = ((glm::vec3(1.f) - toline) * (*j).position) + (toline * (axisstart + drawaxis * s));
+		}
+
+		up = nochange;
 	}
 
 	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)

@@ -331,17 +331,27 @@ int main() {
 			glm::vec4 cursorPos;
 
 			if (inPinchMode) {
+				glm::vec3 fixed = meshes[0].fixed;
+				glm::vec3 nochange = fixed - glm::normalize(glm::abs(cam.getPos()));
+				glm::vec3 ref = fixed - nochange;
+
 				glm::vec3 drawaxis = meshes[0].getAxis();
-				glm::vec3 axisstart = meshes[0].getPoint();
+				glm::vec3 axisstart = meshes[0].getPoint(nochange);
+
 				glm::vec2 mouse = cb->getCursorPosGL();
 	
 				float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
 				cursorPos = glm::vec4(mouse * perspectiveMultiplier, -cam.radius, 1.0f);
 				cursorPos = glm::inverse(cam.getView()) * cursorPos;
 
-				float t = (cursorPos.y / drawaxis.y);
+				//float t = (glm::length(glm::vec4(nochange, 1.f) * cursorPos) / glm::length(nochange * drawaxis));
 
-				float disttoaxis = glm::distance(glm::vec3(cam.getPos().x, 0, 0), glm::vec3((axisstart + drawaxis * t).x, 0, 0));
+				glm::vec3 y = glm::vec4(nochange, 1.f) * cursorPos;
+				glm::vec3 m = nochange * drawaxis;
+
+				float t = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+
+				float disttoaxis = glm::distance(ref * cam.getPos(), ref * (axisstart + drawaxis * t));
 
 				cursorPos = glm::vec4(mouse * glm::tan(glm::radians(22.5f)) * disttoaxis, -disttoaxis, 1.0f);
 				cursorPos = glm::inverse(cam.getView()) * cursorPos;
@@ -441,7 +451,7 @@ int main() {
 				meshes[0].pinch2 = lines.back().verts;
 				lines.pop_back();
 
-				meshes[0].setPinch(50);
+				meshes[0].setPinch(50, cam.getPos());
 				meshes[0].create(50);
 				meshes[0].updateGPU();
 
@@ -514,7 +524,7 @@ int main() {
 				boundInProgress = nullptr;
 
 				glm::vec3 drawaxis = meshInProgress->getAxis();
-				glm::vec3 axisstart = meshInProgress->getPoint();
+				glm::vec3 axisstart = meshInProgress->getPoint(cam.getUp());
 				bounds.emplace_back();
 				boundInProgress = &bounds.back();
 				boundInProgress->verts.push_back(Vertex{ 50.f * drawaxis + axisstart, glm::vec3(1.0f, 0.7f, 0.0f), glm::vec3(0.0f) });
