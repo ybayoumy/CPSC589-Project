@@ -283,6 +283,7 @@ int main() {
 	bool showAxes = true;
 	bool simpleWireframe = false;
 	bool inDrawMode = true;
+	bool inPinchMode = false;
 	bool showbounds = true;
 	//bool sweep = false;
 
@@ -326,10 +327,30 @@ int main() {
 		glfwPollEvents();
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time
-		if (inDrawMode && cb->leftMouseDown) {
-			float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
-			glm::vec4 cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
-			cursorPos = glm::inverse(cam.getView()) * cursorPos;
+		if ((inDrawMode||inPinchMode) && cb->leftMouseDown) {
+			glm::vec4 cursorPos;
+
+			if (inPinchMode) {
+				glm::vec3 drawaxis = meshes[0].getAxis();
+				glm::vec3 axisstart = meshes[0].getPoint();
+				glm::vec2 mouse = cb->getCursorPosGL();
+	
+				float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
+				cursorPos = glm::vec4(mouse * perspectiveMultiplier, -cam.radius, 1.0f);
+				cursorPos = glm::inverse(cam.getView()) * cursorPos;
+
+				float t = (cursorPos.y / drawaxis.y);
+
+				float disttoaxis = glm::distance(glm::vec3(cam.getPos().x, 0, 0), glm::vec3((axisstart + drawaxis * t).x, 0, 0));
+
+				cursorPos = glm::vec4(mouse * glm::tan(glm::radians(22.5f)) * disttoaxis, -disttoaxis, 1.0f);
+				cursorPos = glm::inverse(cam.getView()) * cursorPos;
+			}
+			else {
+				float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
+				cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
+				cursorPos = glm::inverse(cam.getView()) * cursorPos;
+			}
 
 			if (lineInProgress) {
 				// add points to line in progress
@@ -353,7 +374,7 @@ int main() {
 				lineInProgress->updateGPU();
 			}
 		}
-		else if (!inDrawMode || !cb->leftMouseDown)
+		else if (!inDrawMode || !cb->leftMouseDown || !inPinchMode)
 			lineInProgress = nullptr;
 
 		// Three functions that must be called each new frame.
@@ -372,11 +393,12 @@ int main() {
 		//change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
 		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
 		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
+		change |= ImGui::Checkbox("Pinch Mode", &inPinchMode);
 		change |= ImGui::Checkbox("Show Axes", &showAxes);
 		change |= ImGui::Checkbox("Show Wireframe", &simpleWireframe);
 		change |= ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
 
-		if (inDrawMode) {
+		if (inDrawMode || inPinchMode) {
 			if (ImGui::Button("View XY Plane") && lines.size() == 0) {
 				cam.phi = 0.f;
 				cam.theta = 0.f;
@@ -412,9 +434,36 @@ int main() {
 		//	}
 		//}
 
-		//if (lines.size() % 2 == 0 && lines.size() != 0) {
-		//	if (ImGui::Button("Update Pinch") && meshchoice != 0) {
+		if (lines.size() == 2 && meshes.size() != 0) {
+			if (ImGui::Button("Update Pinch")) {
+				meshes[0].pinch1 = lines.back().verts;
+				lines.pop_back();
+				meshes[0].pinch2 = lines.back().verts;
+				lines.pop_back();
 
+				meshes[0].setPinch(50);
+				meshes[0].create(50);
+				meshes[0].updateGPU();
+
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				for (auto i = (meshes[0].pinch1).verts.begin(); i < (meshes[0].pinch1).verts.end(); i++) {
+					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				for (auto i = (meshes[0].pinch2).verts.begin(); i < (meshes[0].pinch2).verts.end(); i++) {
+					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+			}
+		}		
+		
 		//		meshes[meshchoice - 1].pinch1 = lines.back().verts;
 		//		lines.pop_back();
 		//		meshes[meshchoice - 1].pinch2 = lines.back().verts;
@@ -435,9 +484,9 @@ int main() {
 				lines.pop_back();
 				meshInProgress->bound2 = lines.back().verts;
 				lines.pop_back();
-				meshInProgress->sweep = cam.getcircle(50);
+				meshInProgress->sweep = cam.getcircle(12);
 				meshInProgress->cam = cam;
-				meshInProgress->create(75);
+				meshInProgress->create(50);
 				meshInProgress->updateGPU();
 
 				bounds.emplace_back();
@@ -461,6 +510,15 @@ int main() {
 				for (auto i = (meshInProgress->sweep).verts.begin(); i < (meshInProgress->sweep).verts.end(); i++) {
 					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
 				}
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				glm::vec3 drawaxis = meshInProgress->getAxis();
+				glm::vec3 axisstart = meshInProgress->getPoint();
+				bounds.emplace_back();
+				boundInProgress = &bounds.back();
+				boundInProgress->verts.push_back(Vertex{ 50.f * drawaxis + axisstart, glm::vec3(1.0f, 0.7f, 0.0f), glm::vec3(0.0f) });
+				boundInProgress->verts.push_back(Vertex{ -50.f * drawaxis + axisstart, glm::vec3(1.0f, 0.7f, 0.0f), glm::vec3(0.0f) });
 				boundInProgress->updateGPU();
 				boundInProgress = nullptr;
 

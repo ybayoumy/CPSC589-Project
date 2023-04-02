@@ -51,6 +51,20 @@ std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
 	return axis;
 }
 
+glm::vec3 closestvec(std::vector<Vertex> points, glm::vec3 point) {
+	glm::vec3 closest;
+	float min = 10.f;
+
+	for (auto i = points.begin(); i < points.end(); i++) {
+		float distance = fabs((*i).position.y - point.y);
+		if (distance < min) {
+			closest = (*i).position;
+			min = distance;
+		}
+	}
+	return closest;
+}
+
 class Mesh
 {
 public:
@@ -64,8 +78,10 @@ public:
 
 	Line sweep;
 
-	//Line pinch1;
-	//Line pinch2;
+	std::vector<Vertex> axis;
+
+	Line pinch1;
+	Line pinch2;
 
 	//glm::vec3 direction;
 	//glm::vec3 updirection;
@@ -77,14 +93,13 @@ public:
 	void create(int sprecision) {
 		verts.clear();
 		indices.clear();
+		axis.clear();
 
-		std::vector<Vertex> axis;
 		std::vector<Vertex> Spline1 = bound1.BSpline(sprecision);
 		std::vector<Vertex> Spline2 = bound2.BSpline(sprecision);
 
 		orderlines(Spline1, Spline2);
 
-		//if (pinch1.verts.size() > 0 && pinch2.verts.size() > 0){
 		//	std::vector<Vertex> PSpline1 = pinch1.BSpline(sprecision);
 		//	std::vector<Vertex> PSpline2 = pinch2.BSpline(sprecision);
 
@@ -128,9 +143,12 @@ public:
 		//	}
 		//}
 		//else {
+
 		for (int i = 0; i <= sprecision; i++) {
 
 			glm::vec3 cvert = 0.5f * Spline1[i].position + 0.5f * Spline2[i].position;
+			axis.push_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
+
 			if (i == 0) {
 				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
 			}
@@ -141,6 +159,19 @@ public:
 			float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(cam.getUp())));
 
 			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
+
+			if (pinch1.verts.size() > 0 && pinch2.verts.size() > 0) {
+				glm::vec3 P1 = closestvec(pinch1.verts, cvert);
+				glm::vec3 P2 = closestvec(pinch2.verts, cvert);
+				glm::vec3 pdiameter = P2 - P1;
+
+				float pscale = 0.5 * glm::length(pdiameter);
+
+				std::cout << pscale << std::endl;
+
+				S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, -pscale });
+			}
+
 			glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
 			glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 			
@@ -228,6 +259,39 @@ public:
 
 	void setColor(glm::vec3 col) {
 		color = col;
+	}
+
+	glm::vec3 getAxis() {
+		glm::vec3 avgaxis = axis.back().position - axis[0].position;
+		return glm::normalize(avgaxis);
+	}
+
+	glm::vec3 getPoint() {
+		float t = (0 - axis[0].position.y) / (getAxis().y);
+		glm::vec3 point = getAxis() * t + axis[0].position;
+		return point;
+	}
+
+	void setPinch(int sprecision) {
+		std::vector<Vertex> P1 = pinch1.BSpline(sprecision);
+		std::vector<Vertex> P2 = pinch2.BSpline(sprecision);
+
+		orderlines(P1, P2);
+
+		glm::vec3 center = 0.25f * (P1[0].position + P2[0].position + P1.back().position + P2.back().position);
+		glm::vec3 newcenter = 0.5f * (axis[0].position + axis.back().position);
+
+		float height = fabs(glm::vec3(0.5f * (P1[0].position + P2[0].position)).y - glm::vec3(0.5f * (P1.back().position + P2.back().position)).y);
+		float newheight = fabs(axis[0].position.y - axis.back().position.y);
+		float scale = newheight / height;
+
+		for (int i = 0; i <= sprecision; i++) {
+			P1[i].position = (scale * (P1[i].position - center)) + newcenter;
+			P2[i].position = (scale * (P2[i].position - center)) + newcenter;
+		}
+
+		pinch1 = P1;
+		pinch2 = P2;
 	}
 
 	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)
