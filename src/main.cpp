@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream> 
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -20,7 +21,7 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Mesh.h"
-#include "Line.h";
+#include "Line.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -255,6 +256,36 @@ std::vector<Line> generateAxisLines() {
 	return axisLines;
 }
 
+void exportToObj(std::string filename, std::vector<Mesh>& meshes) {
+	std::string verticesString;
+	std::string normalsString;
+	std::vector<std::string> faceGroups;
+
+	int offset = 0;
+	for (int i = 0; i < meshes.size(); i++) {
+		for (Vertex& vert : meshes[i].verts) {
+			verticesString += "v " + std::to_string(vert.position.x) + " " + std::to_string(vert.position.y) + " " + std::to_string(vert.position.z) + "\n";
+			normalsString += "vn " + std::to_string(vert.normal.x) + " " + std::to_string(vert.normal.y) + " " + std::to_string(vert.normal.z) + "\n";
+		}
+
+		std::string groupString = "g object " + std::to_string(i) + "\n";
+		for (int i = 2; i < meshes[i].indices.size(); i += 3) {
+			groupString += "f " + std::to_string(meshes[i].indices[i - 2] + offset) + "//" + std::to_string(meshes[i].indices[i - 2] + offset) + " " + std::to_string(meshes[i].indices[i - 1] + offset) + "//" + std::to_string(meshes[i].indices[i - 1] + offset) + " " + std::to_string(meshes[i].indices[i] + offset) + "//" + std::to_string(meshes[i].indices[i] + offset) + "\n";
+		}
+		offset += meshes[i].verts.size();
+	}
+
+	std::ofstream outfile(filename);
+
+	outfile << verticesString << std::endl;
+	outfile << normalsString << std::endl;
+	for (std::string& groupString : faceGroups) {
+		outfile << groupString << std::endl;
+	}
+
+	outfile.close();
+}
+
 int main() {
 	Log::debug("Starting main");
 
@@ -320,6 +351,8 @@ int main() {
 	//bool XZ = false;
 
 	//int meshchoice = 0;
+
+	char ObjFilename[] = "";
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
@@ -467,6 +500,13 @@ int main() {
 				meshInProgress = nullptr;
 			}
 		}
+
+		ImGui::Text("");
+		ImGui::Text("Export to .obj");
+		ImGui::InputText("Filename", ObjFilename, size_t(32));
+		if (sizeof(ObjFilename) > 0 && ImGui::Button("Save"))
+			exportToObj(ObjFilename, meshes);
+		ImGui::Text("");
 
 		// Framerate display, in case you need to debug performance.
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
