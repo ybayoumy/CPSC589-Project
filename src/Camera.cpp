@@ -63,6 +63,9 @@ void Camera::incrementR(float dr) {
 	if (isFixed) return;
 
 	radius -= dr;
+
+	if (radius > 40.0f) radius = 40.0f;
+	else if (radius < -40.0f) radius = -40.0f;
 }
 
 std::vector<Vertex> Camera::getcircle(int inc) {

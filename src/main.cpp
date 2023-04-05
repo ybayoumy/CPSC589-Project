@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream> 
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -20,7 +21,7 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Mesh.h"
-#include "Line.h";
+#include "Line.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -51,42 +52,6 @@ std::vector<glm::vec3> reverseChaikinAlgorithm(std::vector<glm::vec3> mousePoint
 		Chaikin.push_back(glm::vec3(xj, yj, 0));
 	}
 	return Chaikin;
-}
-
-Mesh unitSphere(int granularity, glm::vec3 col) {
-	float angleStep = M_PI / granularity;
-
-	Mesh res;
-
-	// calculating points
-	for (int j = 0; j < 2 * granularity + 1; j++) {
-		float phi = angleStep * j;
-		for (int i = 0; i < granularity + 1; i++) {
-			float theta = angleStep * i;
-			glm::vec3 point(glm::sin(theta) * glm::sin(phi), glm::cos(theta), glm::sin(theta) * glm::cos(phi));
-			res.verts.push_back(Vertex{ point, col, point });
-		}
-	}
-
-	// creating faces using vertex indices
-	for (int i = 1; i < granularity + 1; i++) {
-		for (int j = 0; j < 2 * granularity + 1; j++) {
-
-			if (j != 0) {
-				res.indices.push_back((granularity + 1) * j + i);
-				res.indices.push_back((granularity + 1) * (j - 1) + i);
-				res.indices.push_back((granularity + 1) * j + i - 1);
-			}
-
-			if (j != 2 * granularity) {
-				res.indices.push_back((granularity + 1) * j + i);
-				res.indices.push_back((granularity + 1) * j + i - 1);
-				res.indices.push_back((granularity + 1) * (j + 1) + i - 1);
-			}
-		}
-	}
-
-	return res;
 }
 
 // EXAMPLE CALLBACKS
@@ -200,10 +165,10 @@ private:
 	void updateUniformLocations() {
 		mLoc = glGetUniformLocation(shader, "M");
 		vLoc = glGetUniformLocation(shader, "V");
-		pLoc = glGetUniformLocation(shader, "P");;
-		lightPosLoc = glGetUniformLocation(shader, "lightPos");;
-		lightColLoc = glGetUniformLocation(shader, "lightCol");;
-		ambientStrengthLoc = glGetUniformLocation(shader, "ambientStrength");;
+		pLoc = glGetUniformLocation(shader, "P");
+		lightPosLoc = glGetUniformLocation(shader, "lightPos");
+		lightColLoc = glGetUniformLocation(shader, "lightCol");
+		ambientStrengthLoc = glGetUniformLocation(shader, "ambientStrength");
 	}
 
 	int screenWidth;
@@ -237,6 +202,59 @@ std::vector<glm::vec3> makecircle(glm::vec3 up, glm::vec2 cam) {
 	return unitcircle;
 }
 
+std::vector<Line> generateAxisLines() {
+	std::vector<Line> axisLines;
+
+	Vertex xPositive{ glm::vec3(50.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f) };
+	Vertex xNegative{ glm::vec3(-50.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{ xNegative, xPositive });
+
+	Vertex yPositive{ glm::vec3(0.0f, 50.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f) };
+	Vertex yNegative{ glm::vec3(0.0f, -50.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{ yNegative, yPositive });
+
+	Vertex zPositive{ glm::vec3(0.0f, 0.0f, 50.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	Vertex zNegative{ glm::vec3(0.0f, 0.0f, -50.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{ zNegative, zPositive });
+
+	return axisLines;
+}
+
+void exportToObj(std::string filename, std::vector<Mesh>& meshes) {
+	std::string verticesString;
+	std::string normalsString;
+	std::vector<std::string> faceGroups;
+
+	int offset = 1;
+	for (int i = 0; i < meshes.size(); i++) {
+		Mesh& mesh = meshes[i];
+
+		for (Vertex& vert : mesh.verts) {
+			verticesString += "v " + std::to_string(vert.position.x) + " " + std::to_string(vert.position.y) + " " + std::to_string(vert.position.z) + "\n";
+			normalsString += "vn " + std::to_string(vert.normal.x) + " " + std::to_string(vert.normal.y) + " " + std::to_string(vert.normal.z) + "\n";
+		}
+
+		std::string groupString = "g object " + std::to_string(i) + "\n";
+		for (int i = 2; i < mesh.indices.size(); i += 3) {
+			//groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "\n";
+			groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + "//" + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + "//" + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "//" + std::to_string(mesh.indices[i] + offset) + "\n";
+		}
+		faceGroups.push_back(groupString);
+
+		offset += mesh.verts.size();
+	}
+
+	std::ofstream outfile(filename);
+
+	outfile << verticesString << std::endl;
+	outfile << normalsString << std::endl;
+	for (std::string& groupString : faceGroups) {
+		outfile << groupString << std::endl;
+	}
+
+	outfile.close();
+}
+
 int main() {
 	Log::debug("Starting main");
 
@@ -250,25 +268,32 @@ int main() {
 	ShaderProgram lightingShader("shaders/lighting3D.vert", "shaders/lighting3D.frag");
 	ShaderProgram noLightingShader("shaders/nolighting3D.vert", "shaders/nolighting3D.frag");
 
-	Camera cam(glm::radians(45.f), glm::radians(45.f), 3.0);
+	Camera cam(glm::radians(0.f), glm::radians(0.f), 3.0);
 	auto cb = std::make_shared<Callbacks3D>(lightingShader, cam, window.getWidth(), window.getHeight());
+
 	// CALLBACKS
 	window.setCallbacks(cb);
 
 	window.setupImGui(); // Make sure this call comes AFTER GLFW callbacks set.
 
-	// Some variables for shading that ImGui may alter.
 	glm::vec3 lightPos(0.f, 35.f, 35.f);
 	glm::vec3 lightCol(1.f);
 	float ambientStrength = 0.035f;
+
+	bool showAxes = true;
 	bool simpleWireframe = false;
-	bool inDrawMode = false;
-	bool render = false;
-	bool sweep = false;
+	bool inDrawMode = true;
+	bool showbounds = true;
+	//bool sweep = false;
 
 	// Set the initial, default values of the shading uniforms.
 	lightingShader.use();
 	cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
+
+	std::vector<Line> axisLines = generateAxisLines();
+	for (Line& line : axisLines) {
+		line.updateGPU();
+	}
 
 	std::vector<Mesh> meshes;
 	Mesh* meshInProgress = nullptr;
@@ -276,47 +301,59 @@ int main() {
 	glm::vec3 lineColor{ 0.0f, 1.0f, 0.0f };
 	std::vector<Line> lines;
 	Line* lineInProgress = nullptr;
+	float pointEpsilon = 0.01f;
 
 	glm::vec3 boundColor{ 1.0f, 0.7f, 0.0f };
 	std::vector<Line> bounds;
 	Line* boundInProgress = nullptr;
 	
-	std::vector<Line> pinch;
-	pinch.push_back(Line());
-	pinch.push_back(Line());
+	//std::vector<Line> pinch;
+	//pinch.push_back(Line());
+	//pinch.push_back(Line());
 
-	std::vector<Line> sweeps;
+	//std::vector<Line> sweeps;
 
-	std::vector<glm::vec3> views;
-	std::vector<glm::vec3> ups;
+	//std::vector<glm::vec3> views;
+	//std::vector<glm::vec3> ups;
 
-	std::vector<glm::vec3> direction;
-	bool XZ = false;
+	//std::vector<glm::vec3> direction;
+	//bool XZ = false;
 
-	bool showbounds = true;
+	//int meshchoice = 0;
 
-	int meshchoice = 0;
+	char ObjFilename[] = "";
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
 		glfwPollEvents();
 
+		// Line Drawing Logic. Max 2 lines can be drawn at a time
 		if (inDrawMode && cb->leftMouseDown) {
 			float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
 			glm::vec4 cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
 			cursorPos = glm::inverse(cam.getView()) * cursorPos;
 
-			Vertex newPoint = Vertex{ cursorPos, lineColor, glm::vec3(0.0f) };
 			if (lineInProgress) {
-				// add point to line in progress
-				lineInProgress->verts.push_back(newPoint);
+				// add points to line in progress
+				Vertex lastVertex = lineInProgress->verts.back();
+				glm::vec3 slope = glm::vec3(cursorPos) - lastVertex.position;
+				float pointDistance = glm::length(slope);
+				slope = glm::normalize(slope);
+
+				for (float dist = pointEpsilon; dist <= pointDistance; dist += pointEpsilon)
+				{
+					Vertex newPoint = Vertex{ lastVertex.position + slope * dist, lineColor, glm::vec3(0.0f) };
+					lineInProgress->verts.push_back(newPoint);
+				}
+
+				lineInProgress->updateGPU();
 			}
-			else {
+			else if (lines.size() < 2){ 
 				// create a new line
-				lines.emplace_back(std::vector<Vertex>{newPoint});
+				lines.emplace_back(std::vector<Vertex>{ Vertex{ cursorPos, lineColor, glm::vec3(0.0f) } });
 				lineInProgress = &lines.back();
+				lineInProgress->updateGPU();
 			}
-			lineInProgress->updateGPU();
 		}
 		else if (!inDrawMode || !cb->leftMouseDown)
 			lineInProgress = nullptr;
@@ -336,63 +373,63 @@ int main() {
 		//change |= ImGui::DragFloat3("Light's position", glm::value_ptr(lightPos));
 		//change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
 		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
-		change |= ImGui::Checkbox("Simple wireframe", &simpleWireframe);
 		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
-		ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
+		change |= ImGui::Checkbox("Show Axes", &showAxes);
+		change |= ImGui::Checkbox("Show Wireframe", &simpleWireframe);
+		change |= ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
 
-		if (ImGui::Button("View XY Plane")) {
-			cam.phi = 0.f;
-			cam.theta = 0.f;
-		}
-
-		if (ImGui::Button("View XZ Plane")) {
-			cam.phi = 0.f;
-			cam.theta = M_PI_2-0.0001f;
-		}
-
-		if (ImGui::Button("View ZY Plane")) {
-			cam.phi = M_PI_2;
-			cam.theta = 0.f;
-		}
-
-		if (meshes.size() > 0) {
-			ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
-		}
-
-		if (lines.size() % 2 != 0 && lines.size() != 0) {
-			if (ImGui::Button("Update Sweep") && meshchoice != 0) {
-				meshes[meshchoice - 1].sweep = meshes[meshchoice - 1].cam.standardize(lines.back().verts);
-				lines.pop_back();
-				meshes[meshchoice - 1].create(75);
-				meshes[meshchoice - 1].updateGPU();
-				
-				bounds.emplace_back();
-				boundInProgress = &bounds.back();
-				for (auto i = (meshes[meshchoice - 1].sweep).verts.begin(); i < (meshes[meshchoice - 1].sweep).verts.end(); i++) {
-					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
-				}
-				boundInProgress->updateGPU();
-				boundInProgress = nullptr;
+		if (inDrawMode) {
+			if (ImGui::Button("View XY Plane") && lines.size() == 0) {
+				cam.phi = 0.f;
+				cam.theta = 0.f;
+			}
+			if (ImGui::Button("View XZ Plane") && lines.size() == 0) {
+				cam.phi = 0.f;
+				cam.theta = M_PI_2 - 0.0001f;
+			}
+			if (ImGui::Button("View ZY Plane") && lines.size() == 0) {
+				cam.phi = M_PI_2;
+				cam.theta = 0.f;
 			}
 		}
 
-		if (lines.size() % 2 == 0 && lines.size() != 0) {
-			if (ImGui::Button("Update Pinch") && meshchoice != 0) {
+		//if (meshes.size() > 0) {
+		//	ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
+		//}
 
-				meshes[meshchoice - 1].pinch1 = lines.back().verts;
-				lines.pop_back();
-				meshes[meshchoice - 1].pinch2 = lines.back().verts;
-				lines.pop_back();
-				meshes[meshchoice - 1].create(75);
-				meshes[meshchoice - 1].updateGPU();
+		//if (lines.size() % 2 != 0 && lines.size() != 0) {
+		//	if (ImGui::Button("Update Sweep") && meshchoice != 0) {
+		//		meshes[meshchoice - 1].sweep = meshes[meshchoice - 1].cam.standardize(lines.back().verts);
+		//		lines.pop_back();
+		//		meshes[meshchoice - 1].create(75);
+		//		meshes[meshchoice - 1].updateGPU();
+		//		
+		//		bounds.emplace_back();
+		//		boundInProgress = &bounds.back();
+		//		for (auto i = (meshes[meshchoice - 1].sweep).verts.begin(); i < (meshes[meshchoice - 1].sweep).verts.end(); i++) {
+		//			boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+		//		}
+		//		boundInProgress->updateGPU();
+		//		boundInProgress = nullptr;
+		//	}
+		//}
+
+		//if (lines.size() % 2 == 0 && lines.size() != 0) {
+		//	if (ImGui::Button("Update Pinch") && meshchoice != 0) {
+
+		//		meshes[meshchoice - 1].pinch1 = lines.back().verts;
+		//		lines.pop_back();
+		//		meshes[meshchoice - 1].pinch2 = lines.back().verts;
+		//		lines.pop_back();
+		//		meshes[meshchoice - 1].create(75);
+		//		meshes[meshchoice - 1].updateGPU();
 
 
-				//sweep = true;
-				//render = true;
-			}
-		}
+		//		//sweep = true;
+		//	}
+		//}
 
-		if (lines.size() % 2 == 0 && lines.size() != 0) {
+		if (lines.size() == 2) {
 			if (ImGui::Button("Create Rotational Blending Surface")) {
 				meshes.emplace_back();
 				meshInProgress = &meshes.back();
@@ -430,43 +467,53 @@ int main() {
 				boundInProgress = nullptr;
 
 				meshInProgress = nullptr;
-				render = true;
 			}
 		}
+
+		ImGui::Text("");
+		ImGui::Text("Export to .obj");
+		ImGui::InputText("Filename", ObjFilename, size_t(32));
+		if (sizeof(ObjFilename) > 0 && ImGui::Button("Save")) {
+			exportToObj(ObjFilename, meshes);
+			memset(ObjFilename, 0, sizeof ObjFilename);
+		}
+		ImGui::Text("");
 
 		// Framerate display, in case you need to debug performance.
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::End();
 		ImGui::Render();
 
-		/*if (sweep) {
-			bounds.emplace_back();
-			boundInProgress = &bounds.back();
+		//if (sweep) {
+		//	bounds.emplace_back();
+		//	boundInProgress = &bounds.back();
 
-			if (meshchoice == 0) {
-				if (sweep) {
-					sweeps[0].standardizesweep(ups[0], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
-				}
-				for (auto i = sweeps[0].verts.begin(); i < sweeps[0].verts.end(); i++) {
-					boundInProgress->verts.push_back((*i));
-				}
-			}
-			else {
-				if (sweep) {
-					sweeps[2 * (meshchoice - 1)].standardizesweep(ups[2 * (meshchoice - 1)], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
-				}
-				for (auto i = sweeps[2 * (meshchoice - 1)].verts.begin(); i < sweeps[2 * (meshchoice - 1)].verts.end(); i++) {
-					boundInProgress->verts.push_back((*i));
-				}
-			}
+		//	if (meshchoice == 0) {
+		//		if (sweep) {
+		//			sweeps[0].standardizesweep(ups[0], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
+		//		}
+		//		for (auto i = sweeps[0].verts.begin(); i < sweeps[0].verts.end(); i++) {
+		//			boundInProgress->verts.push_back((*i));
+		//		}
+		//	}
+		//	else {
+		//		if (sweep) {
+		//			sweeps[2 * (meshchoice - 1)].standardizesweep(ups[2 * (meshchoice - 1)], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
+		//		}
+		//		for (auto i = sweeps[2 * (meshchoice - 1)].verts.begin(); i < sweeps[2 * (meshchoice - 1)].verts.end(); i++) {
+		//			boundInProgress->verts.push_back((*i));
+		//		}
+		//	}
 
-			boundInProgress->updateGPU();
-			boundInProgress = nullptr;
-			sweep = false;
-		}*/
+		//	boundInProgress->updateGPU();
+		//	boundInProgress = nullptr;
+		//	sweep = false;
+		//}
 
 		if (change) {
 			if (inDrawMode) {
+				cam.phi = 0.f;
+				cam.theta = 0.f;
 				cam.fix();
 			}
 			else {
@@ -481,6 +528,16 @@ int main() {
 		glEnable(GL_DEPTH_TEST);
 		glPolygonMode(GL_FRONT_AND_BACK, (simpleWireframe ? GL_LINE : GL_FILL) );
 
+		// Drawing Axis Lines (no Lighting)
+		if (showAxes) {
+			noLightingShader.use();
+			cb->viewPipeline();
+			for (Line& line : axisLines) {
+				line.draw(noLightingShader);
+			}
+		}
+
+		// Drawing Meshes (with Lighting)
 		lightingShader.use();
 		if (change)
 		{
@@ -491,11 +548,14 @@ int main() {
 			mesh.draw(lightingShader);
 		}
 		
+		// Drawing Lines (no Lighting)
 		noLightingShader.use();
 		cb->viewPipeline();
 		for (Line& line : lines) {
 			line.draw(noLightingShader);
 		}
+
+		// Drawing Lines (no Lighting)
 		if (showbounds) {
 			for (Line& bound : bounds) {
 				bound.draw(noLightingShader);
