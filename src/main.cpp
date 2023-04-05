@@ -54,42 +54,6 @@ std::vector<glm::vec3> reverseChaikinAlgorithm(std::vector<glm::vec3> mousePoint
 	return Chaikin;
 }
 
-Mesh unitSphere(int granularity, glm::vec3 col) {
-	float angleStep = M_PI / granularity;
-
-	Mesh res;
-
-	// calculating points
-	for (int j = 0; j < 2 * granularity + 1; j++) {
-		float phi = angleStep * j;
-		for (int i = 0; i < granularity + 1; i++) {
-			float theta = angleStep * i;
-			glm::vec3 point(glm::sin(theta) * glm::sin(phi), glm::cos(theta), glm::sin(theta) * glm::cos(phi));
-			res.verts.push_back(Vertex{ point, col, point });
-		}
-	}
-
-	// creating faces using vertex indices
-	for (int i = 1; i < granularity + 1; i++) {
-		for (int j = 0; j < 2 * granularity + 1; j++) {
-
-			if (j != 0) {
-				res.indices.push_back((granularity + 1) * j + i);
-				res.indices.push_back((granularity + 1) * (j - 1) + i);
-				res.indices.push_back((granularity + 1) * j + i - 1);
-			}
-
-			if (j != 2 * granularity) {
-				res.indices.push_back((granularity + 1) * j + i);
-				res.indices.push_back((granularity + 1) * j + i - 1);
-				res.indices.push_back((granularity + 1) * (j + 1) + i - 1);
-			}
-		}
-	}
-
-	return res;
-}
-
 // EXAMPLE CALLBACKS
 class Callbacks3D : public CallbackInterface {
 
@@ -261,18 +225,23 @@ void exportToObj(std::string filename, std::vector<Mesh>& meshes) {
 	std::string normalsString;
 	std::vector<std::string> faceGroups;
 
-	int offset = 0;
+	int offset = 1;
 	for (int i = 0; i < meshes.size(); i++) {
-		for (Vertex& vert : meshes[i].verts) {
+		Mesh& mesh = meshes[i];
+
+		for (Vertex& vert : mesh.verts) {
 			verticesString += "v " + std::to_string(vert.position.x) + " " + std::to_string(vert.position.y) + " " + std::to_string(vert.position.z) + "\n";
 			normalsString += "vn " + std::to_string(vert.normal.x) + " " + std::to_string(vert.normal.y) + " " + std::to_string(vert.normal.z) + "\n";
 		}
 
 		std::string groupString = "g object " + std::to_string(i) + "\n";
-		for (int i = 2; i < meshes[i].indices.size(); i += 3) {
-			groupString += "f " + std::to_string(meshes[i].indices[i - 2] + offset) + "//" + std::to_string(meshes[i].indices[i - 2] + offset) + " " + std::to_string(meshes[i].indices[i - 1] + offset) + "//" + std::to_string(meshes[i].indices[i - 1] + offset) + " " + std::to_string(meshes[i].indices[i] + offset) + "//" + std::to_string(meshes[i].indices[i] + offset) + "\n";
+		for (int i = 2; i < mesh.indices.size(); i += 3) {
+			//groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "\n";
+			groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + "//" + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + "//" + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "//" + std::to_string(mesh.indices[i] + offset) + "\n";
 		}
-		offset += meshes[i].verts.size();
+		faceGroups.push_back(groupString);
+
+		offset += mesh.verts.size();
 	}
 
 	std::ofstream outfile(filename);
@@ -504,8 +473,10 @@ int main() {
 		ImGui::Text("");
 		ImGui::Text("Export to .obj");
 		ImGui::InputText("Filename", ObjFilename, size_t(32));
-		if (sizeof(ObjFilename) > 0 && ImGui::Button("Save"))
+		if (sizeof(ObjFilename) > 0 && ImGui::Button("Save")) {
 			exportToObj(ObjFilename, meshes);
+			memset(ObjFilename, 0, sizeof ObjFilename);
+		}
 		ImGui::Text("");
 
 		// Framerate display, in case you need to debug performance.
