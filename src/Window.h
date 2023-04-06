@@ -83,6 +83,10 @@ public:
 
 	void setupImGui();
 
+	// Function for getting the framebuffer size in pixels,
+	// which may be different than the window size in screen coordinates.
+	glm::ivec2 getFramebufferSize() const;
+
 private:
 	std::unique_ptr<GLFWwindow, WindowDeleter> window; // owning ptr (from GLFW)
 	std::shared_ptr<CallbackInterface> callbacks;      // optional shared owning ptr (user provided)
