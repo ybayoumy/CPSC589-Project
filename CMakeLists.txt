@@ -130,3 +130,5 @@ target_link_libraries(${APP_NAME} ${LIBRARIES})
 target_compile_definitions(${APP_NAME} PRIVATE ${DEFINITIONS})
 target_compile_options(${APP_NAME} PRIVATE ${_589_CMAKE_CXX_FLAGS})
 set_target_properties(${APP_NAME} PROPERTIES INSTALL_RPATH "./" BUILD_RPATH "./")
+
+add_definitions( -DRUNTIME_OUTPUT_DIRECTORY="${CMAKE_BINARY_DIR}" )

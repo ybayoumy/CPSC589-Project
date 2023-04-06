@@ -63,13 +63,13 @@ public:
 	Callbacks3D(ShaderProgram& shader, Camera& camera, int screenWidth, int screenHeight)
 		: shader(shader)
 		, camera(camera)
-		, aspect(1.0f)
 		, rightMouseDown(false)
 		, leftMouseDown(false)
 		, mouseOldX(-1.0)
 		, mouseOldY(-1.0)
 		, screenWidth(screenWidth)
 		, screenHeight(screenHeight)
+		, aspect(screenWidth/screenHeight)
 	{
 		updateUniformLocations();
 	}
@@ -220,39 +220,46 @@ std::vector<Line> generateAxisLines() {
 	return axisLines;
 }
 
-void exportToObj(std::string filename, std::vector<Mesh>& meshes) {
-	std::string verticesString;
-	std::string normalsString;
-	std::vector<std::string> faceGroups;
+// return true if export was successful, false otherwise
+bool exportToObj(std::string filename, std::vector<Mesh>& meshes) {
+	try {
+		std::string verticesString;
+		std::string normalsString;
+		std::vector<std::string> faceGroups;
 
-	int offset = 1;
-	for (int i = 0; i < meshes.size(); i++) {
-		Mesh& mesh = meshes[i];
+		int offset = 1;
+		for (int i = 0; i < meshes.size(); i++) {
+			Mesh& mesh = meshes[i];
 
-		for (Vertex& vert : mesh.verts) {
-			verticesString += "v " + std::to_string(vert.position.x) + " " + std::to_string(vert.position.y) + " " + std::to_string(vert.position.z) + "\n";
-			normalsString += "vn " + std::to_string(vert.normal.x) + " " + std::to_string(vert.normal.y) + " " + std::to_string(vert.normal.z) + "\n";
+			for (Vertex& vert : mesh.verts) {
+				verticesString += "v " + std::to_string(vert.position.x) + " " + std::to_string(vert.position.y) + " " + std::to_string(vert.position.z) + "\n";
+				normalsString += "vn " + std::to_string(vert.normal.x) + " " + std::to_string(vert.normal.y) + " " + std::to_string(vert.normal.z) + "\n";
+			}
+
+			std::string groupString = "g object " + std::to_string(i) + "\n";
+			for (int i = 2; i < mesh.indices.size(); i += 3) {
+				//groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "\n";
+				groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + "//" + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + "//" + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "//" + std::to_string(mesh.indices[i] + offset) + "\n";
+			}
+			faceGroups.push_back(groupString);
+
+			offset += mesh.verts.size();
 		}
 
-		std::string groupString = "g object " + std::to_string(i) + "\n";
-		for (int i = 2; i < mesh.indices.size(); i += 3) {
-			//groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "\n";
-			groupString += "f " + std::to_string(mesh.indices[i - 2] + offset) + "//" + std::to_string(mesh.indices[i - 2] + offset) + " " + std::to_string(mesh.indices[i - 1] + offset) + "//" + std::to_string(mesh.indices[i - 1] + offset) + " " + std::to_string(mesh.indices[i] + offset) + "//" + std::to_string(mesh.indices[i] + offset) + "\n";
+		std::ofstream outfile(filename);
+
+		outfile << verticesString << std::endl;
+		outfile << normalsString << std::endl;
+		for (std::string& groupString : faceGroups) {
+			outfile << groupString << std::endl;
 		}
-		faceGroups.push_back(groupString);
 
-		offset += mesh.verts.size();
+		outfile.close();
+		return true;
 	}
-
-	std::ofstream outfile(filename);
-
-	outfile << verticesString << std::endl;
-	outfile << normalsString << std::endl;
-	for (std::string& groupString : faceGroups) {
-		outfile << groupString << std::endl;
+	catch (std::exception& e) {
+		return false;
 	}
-
-	outfile.close();
 }
 
 int main() {
@@ -260,7 +267,7 @@ int main() {
 
 	// WINDOW
 	glfwInit();
-	Window window(800, 800, "CPSC 589 Project"); // could set callbacks at construction if desired
+	Window window(1280, 960, "CPSC 589 Project"); // could set callbacks at construction if desired
 
 	GLDebug::enable();
 
@@ -269,6 +276,7 @@ int main() {
 	ShaderProgram noLightingShader("shaders/nolighting3D.vert", "shaders/nolighting3D.frag");
 
 	Camera cam(glm::radians(0.f), glm::radians(0.f), 3.0);
+	cam.fix();
 	auto cb = std::make_shared<Callbacks3D>(lightingShader, cam, window.getWidth(), window.getHeight());
 
 	// CALLBACKS
@@ -280,10 +288,10 @@ int main() {
 	glm::vec3 lightCol(1.f);
 	float ambientStrength = 0.035f;
 
+	bool inDrawMode = true;
 	bool showAxes = true;
 	bool simpleWireframe = false;
-	bool inDrawMode = true;
-	bool showbounds = true;
+	bool showbounds = false;
 	//bool sweep = false;
 
 	// Set the initial, default values of the shading uniforms.
@@ -322,6 +330,7 @@ int main() {
 	//int meshchoice = 0;
 
 	char ObjFilename[] = "";
+	std::string lastExportedFilename = "";
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
@@ -375,10 +384,11 @@ int main() {
 		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
 		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
 		change |= ImGui::Checkbox("Show Axes", &showAxes);
-		change |= ImGui::Checkbox("Show Wireframe", &simpleWireframe);
-		change |= ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
+		// change |= ImGui::Checkbox("Show Wireframe", &simpleWireframe);
+		// change |= ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
 
 		if (inDrawMode) {
+			ImGui::Text("");
 			if (ImGui::Button("View XY Plane") && lines.size() == 0) {
 				cam.phi = 0.f;
 				cam.theta = 0.f;
@@ -430,6 +440,7 @@ int main() {
 		//}
 
 		if (lines.size() == 2) {
+			ImGui::Text("");
 			if (ImGui::Button("Create Rotational Blending Surface")) {
 				meshes.emplace_back();
 				meshInProgress = &meshes.back();
@@ -470,16 +481,43 @@ int main() {
 			}
 		}
 
-		ImGui::Text("");
-		ImGui::Text("Export to .obj");
-		ImGui::InputText("Filename", ObjFilename, size_t(32));
-		if (sizeof(ObjFilename) > 0 && ImGui::Button("Save")) {
-			exportToObj(ObjFilename, meshes);
-			memset(ObjFilename, 0, sizeof ObjFilename);
+		if (!inDrawMode) {
+			ImGui::Text("");
+			ImGui::Text("Export to .obj");
+			ImGui::InputText("Filename", ObjFilename, size_t(32));
+			if (sizeof(ObjFilename) > 0 && ImGui::Button("Save")) {
+				std::string filename = ObjFilename;
+				if (filename.find(".obj") == std::string::npos) filename += ".obj";
+
+				bool isSuccessful = exportToObj(filename, meshes);
+				if (isSuccessful) {
+					ImGui::OpenPopup("ExportObjSuccessPopup");
+					lastExportedFilename = RUNTIME_OUTPUT_DIRECTORY + std::string("/") + filename;
+					memset(ObjFilename, 0, sizeof ObjFilename);
+				}
+				else {
+					ImGui::OpenPopup("ExportObjErrorPopup");
+					lastExportedFilename = "";
+				}
+			}
 		}
-		ImGui::Text("");
+
+		if (ImGui::BeginPopupModal("ExportObjSuccessPopup")) {
+			ImGui::Text("Successfully exported .obj file. File can be found here:");
+			ImGui::Text(lastExportedFilename.c_str());
+			ImGui::Text("");
+			if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+		else if (ImGui::BeginPopupModal("ExportObjErrorPopup")) {
+			ImGui::Text("There was an error exporting the .obj file.");
+			ImGui::Text("");
+			if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
 
 		// Framerate display, in case you need to debug performance.
+		ImGui::Text("");
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::End();
 		ImGui::Render();
