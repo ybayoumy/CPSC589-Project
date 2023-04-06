@@ -372,7 +372,11 @@ int main() {
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		ImGui::Begin("CPSC 589 Project");
+		std::string imguiWindowTitle = "";
+		if (inDrawMode) imguiWindowTitle = "Draw Mode";
+		else imguiWindowTitle = "Free View";
+
+		ImGui::Begin(imguiWindowTitle.c_str());
 
 		bool change = false; // Whether any ImGui variable's changed.
 
@@ -382,10 +386,21 @@ int main() {
 		//change |= ImGui::DragFloat3("Light's position", glm::value_ptr(lightPos));
 		//change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
 		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
-		change |= ImGui::Checkbox("Drawing Mode", &inDrawMode);
-		change |= ImGui::Checkbox("Show Axes", &showAxes);
 		// change |= ImGui::Checkbox("Show Wireframe", &simpleWireframe);
 		// change |= ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
+
+		if (!inDrawMode) {
+			if (ImGui::Button("Draw Mode")) {
+				inDrawMode = true;
+				change = true;
+			}
+		}
+		else {
+			if (ImGui::Button("Free View")) {
+				inDrawMode = false;
+				change = true;
+			}
+		}
 
 		if (inDrawMode) {
 			ImGui::Text("");
@@ -401,6 +416,12 @@ int main() {
 				cam.phi = M_PI_2;
 				cam.theta = 0.f;
 			}
+			ImGui::Text("");
+			std::string linesDrawn = "Lines Drawn: " + std::to_string(lines.size()) + "/" + std::to_string(2);
+
+			if(lines.size() == 2) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
+			ImGui::Text(linesDrawn.c_str());
+			if (lines.size() == 2) ImGui::PopStyleColor();
 		}
 
 		//if (meshes.size() > 0) {
@@ -440,7 +461,6 @@ int main() {
 		//}
 
 		if (lines.size() == 2) {
-			ImGui::Text("");
 			if (ImGui::Button("Create Rotational Blending Surface")) {
 				meshes.emplace_back();
 				meshInProgress = &meshes.back();
@@ -518,6 +538,7 @@ int main() {
 
 		// Framerate display, in case you need to debug performance.
 		ImGui::Text("");
+		change |= ImGui::Checkbox("Show Axes", &showAxes);
 		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::End();
 		ImGui::Render();
