@@ -247,18 +247,6 @@ private:
 	Camera& camera;
 };
 
-std::vector<glm::vec3> makecircle(glm::vec3 up, glm::vec2 cam) {
-	int tinc = 24;
-	std::vector<glm::vec3> unitcircle;
-	for (int i = 0; i < tinc; i++) {
-		float angle = i * 2 * M_PI / tinc;
-		glm::mat4 R = glm::rotate(glm::mat4(1.f), cam.x + float(M_PI/2), up);
-		glm::vec3 point = R * glm::vec4(cos(angle), sin(angle), 0, 1.f);
-		unitcircle.push_back(point);
-	}
-	return unitcircle;
-}
-
 std::vector<Line> generateAxisLines() {
 	std::vector<Line> axisLines;
 
