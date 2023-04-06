@@ -132,7 +132,9 @@ public:
 
 			glm::vec3 cvert = 0.5f * Spline1[i].position + 0.5f * Spline2[i].position;
 			if (i == 0) {
-				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
+				glm::vec3 cvertnext = 0.5f * Spline1[i+1].position + 0.5f * Spline2[i+1].position;
+				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::normalize(cvert - cvertnext)});
+				std::cout << cvert - cvertnext << std::endl;
 			}
 
 			glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
@@ -151,7 +153,9 @@ public:
 			}
 
 			if (i == sprecision) {
-				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
+				glm::vec3 cvertprev = 0.5f * Spline1[i - 1].position + 0.5f * Spline2[i - 1].position;
+				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::normalize(cvert - cvertprev)});
+				std::cout << cvert - cvertprev << std::endl;
 			}
 		
 		}
