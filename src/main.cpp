@@ -399,6 +399,7 @@ int main() {
 			if (ImGui::Button("Free View")) {
 				inDrawMode = false;
 				change = true;
+				lines.clear();
 			}
 		}
 
@@ -422,6 +423,9 @@ int main() {
 			if(lines.size() == 2) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 			ImGui::Text(linesDrawn.c_str());
 			if (lines.size() == 2) ImGui::PopStyleColor();
+			if (ImGui::Button("Clear Lines")) {
+				lines.clear();
+			}
 		}
 
 		//if (meshes.size() > 0) {
