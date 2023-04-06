@@ -98,6 +98,40 @@ public:
 		glBindVertexArray(0);
 	}
 
+	void ChaikinAlg(int iter, glm::vec3 color) {
+		glm::vec3 newpoint;
+		std::vector<Vertex> Chaikin;
+		for (int n = 0; n < iter; n++) {
+			
+			Chaikin.clear();
+			int m = verts.size()-1;
+
+			// C[0] = F[0]
+			newpoint = verts[0].position;
+			Chaikin.push_back(Vertex{newpoint, color, glm::vec3(0.f)});
+			
+			// C[1] = - 1/2F[0] + F[1] + 3/4F[2] - 1/4F[3]
+			newpoint = -0.5f * verts[0].position + verts[1].position + 0.75f * verts[2].position - 0.25f * verts[3].position;
+			Chaikin.push_back(Vertex{newpoint, color, glm::vec3(0.f) });
+
+			for (int i = 2; i <= m-5; i += 2) {
+				// C[j] = - 1/4F[i] + 3/4F[i+1] + 3/4F[i+2] - 1/4F[i+3]
+				newpoint = -0.25f * verts[i].position + 0.75f * verts[i+1].position + 0.75f * verts[i+2].position - 0.25f * verts[i+3].position;
+				Chaikin.push_back(Vertex{newpoint, color, glm::vec3(0.f)});
+			}
+
+			// C[j] = - 1/4F[m-3] + 3/4F[m-2] + F[m-1] - 1/2F[m]
+			newpoint = -0.25f * verts[m - 3].position + 0.75f * verts[m - 2].position + verts[m - 1].position - 0.5f * verts[m].position;
+			Chaikin.push_back(Vertex{ newpoint, color, glm::vec3(0.f) });
+
+			// C[j+1] = F[m]
+			newpoint = verts[m].position;
+			Chaikin.push_back(Vertex{ newpoint, color, glm::vec3(0.f) });
+
+			verts = Chaikin;
+		}
+	}
+
 	std::vector<Vertex> BSpline(int precision) {
 		std::vector <Vertex> spline;
 		
