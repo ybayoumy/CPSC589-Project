@@ -297,6 +297,7 @@ int main() {
 	bool showAxes = true;
 	bool simpleWireframe = false;
 	bool showbounds = false;
+	bool hide = false;
 	//bool sweep = false;
 
 	// Set the initial, default values of the shading uniforms.
@@ -328,7 +329,7 @@ int main() {
 	int selectedPointIndex = -1; // Used for point dragging & deletion
 	glm::vec2 editing = glm::vec2(-1, -1);
 
-	int precision = 300;
+	int precision = 150;
 
 	//std::vector<Line> pinch;
 	//pinch.push_back(Line());
@@ -446,6 +447,7 @@ int main() {
 				inEditMode = false;
 				change = true;
 			}
+			//ImGui::Checkbox("Hide", &hide);
 		}
 		else {
 			if (ImGui::Button("Free View")) {
@@ -458,6 +460,16 @@ int main() {
 			if (ImGui::Button("Edit Mode")) {
 				inDrawMode = false;
 				inEditMode = true;
+			}
+		}
+
+		if (inEditMode) {
+			if (ImGui::Button("Free View")) {
+				inDrawMode = false;
+				inEditMode = false;
+				change = true;
+				lines.clear();
+				points.clear();
 			}
 		}
 
@@ -539,13 +551,12 @@ int main() {
 
 				bounds.emplace_back();
 				boundInProgress = &bounds.back();
-				for (auto i = (meshInProgress->bound1).verts.begin(); i < (meshInProgress->bound1).verts.end(); i++) {
-					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
-				}
+				boundInProgress->verts.push_back(Vertex{meshInProgress->bound1.verts.back().position, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f) });
+				boundInProgress->verts.push_back(Vertex{meshInProgress->bound2.verts.back().position, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f) });
 				boundInProgress->updateGPU();
 				boundInProgress = nullptr;
 
-				bounds.emplace_back();
+				/*bounds.emplace_back();
 				boundInProgress = &bounds.back();
 				for (auto i = (meshInProgress->bound2).verts.begin(); i < (meshInProgress->bound2).verts.end(); i++) {
 					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
@@ -562,6 +573,7 @@ int main() {
 				boundInProgress = nullptr;
 
 				meshInProgress = nullptr;
+				*/
 			}
 		}
 
@@ -668,7 +680,9 @@ int main() {
 		}
 		cb->viewPipeline();
 		for (Mesh& mesh : meshes) {
-			mesh.draw(lightingShader);
+			if (!hide) {
+				mesh.draw(lightingShader);
+			}
 		}
 
 		// Drawing Lines (no Lighting)
@@ -688,11 +702,11 @@ int main() {
 		}
 
 		// Drawing Lines (no Lighting)
-		if (showbounds) {
+		/*if (inEditMode) {
 			for (Line& bound : bounds) {
-				bound.draw(noLightingShader);
+				bound.drawPoints(pointSize, noLightingShader);
 			}
-		}
+		}*/
 
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui
 
