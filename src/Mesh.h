@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <glm/gtx/vector_angle.hpp>
 #include <vector>
 #include <memory>
 #include <string>
@@ -82,6 +83,11 @@ public:
 		std::vector<Vertex> Spline1 = bound1.BSpline(sprecision);
 		std::vector<Vertex> Spline2 = bound2.BSpline(sprecision);
 
+		glm::vec3 cvert = glm::vec3(0.f);
+		glm::vec3 diameter = glm::vec3(0.f);
+		float scale;
+		float theta;
+
 		orderlines(Spline1, Spline2);
 
 		//if (pinch1.verts.size() > 0 && pinch2.verts.size() > 0){
@@ -130,22 +136,21 @@ public:
 		//else {
 		for (int i = 0; i <= sprecision; i++) {
 
-			glm::vec3 cvert = 0.5f * Spline1[i].position + 0.5f * Spline2[i].position;
+			cvert = 0.5f * (Spline1[i].position + Spline2[i].position);
+
 			if (i == 0) {
 				glm::vec3 cvertnext = 0.5f * Spline1[i+1].position + 0.5f * Spline2[i+1].position;
 				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::normalize(cvert - cvertnext)});
-				std::cout << cvert - cvertnext << std::endl;
 			}
 
-			glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
-
-			float scale = 0.5 * glm::length(diameter);
-			float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(cam.getUp())));
+			diameter = (Spline1[i].position - Spline2[i].position);
+			scale = 0.5 * glm::length(diameter);
+			theta = glm::orientedAngle(glm::normalize(cam.getUp()), glm::normalize(diameter), -glm::normalize(cam.getPos()));
 
 			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
 			glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
 			glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
-			
+		
 			for (int j = 0; j < sweep.verts.size(); j++) {
 				glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
 				glm::vec3 normal = glm::normalize(point - cvert);
@@ -155,7 +160,6 @@ public:
 			if (i == sprecision) {
 				glm::vec3 cvertprev = 0.5f * Spline1[i - 1].position + 0.5f * Spline2[i - 1].position;
 				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::normalize(cvert - cvertprev)});
-				std::cout << cvert - cvertprev << std::endl;
 			}
 		
 		}

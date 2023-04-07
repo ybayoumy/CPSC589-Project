@@ -396,6 +396,7 @@ int main()
 	bool showAxes = true;
 	bool simpleWireframe = false;
 	bool showbounds = false;
+	bool hide = false;
 	// bool sweep = false;
 
 	// Set the initial, default values of the shading uniforms.
@@ -419,6 +420,8 @@ int main()
 	glm::vec3 boundColor{1.0f, 0.7f, 0.0f};
 	std::vector<Line> bounds;
 	Line *boundInProgress = nullptr;
+
+	int precision = 150;
 
 	// std::vector<Line> pinch;
 	// pinch.push_back(Line());
@@ -596,7 +599,7 @@ int main()
 					lines.pop_back();
 					meshInProgress->sweep = cam.getcircle(50);
 					meshInProgress->cam = cam;
-					meshInProgress->create(75);
+					meshInProgress->create(precision);
 					meshInProgress->updateGPU();
 
 					bounds.emplace_back();
