@@ -132,7 +132,7 @@ public:
 		}
 	}
 
-	std::vector<Vertex> BSpline(int precision) {
+	std::vector<Vertex> BSpline(int precision, glm::vec3 color) {
 		std::vector <Vertex> spline;
 		
 		float u;
@@ -141,7 +141,7 @@ public:
 
 		for (int i = 0; i <= precision; i++) {
 			u = double(i) / precision;
-			spline.push_back(Vertex{ getvert(verts, basis, u, 3, verts.size() - 1), glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
+			spline.push_back(Vertex{ getvert(verts, basis, u, 3, verts.size() - 1), color, glm::vec3(0.f, 0.f, 0.f) });
 		}
 
 		return spline;

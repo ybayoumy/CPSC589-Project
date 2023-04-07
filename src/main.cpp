@@ -37,7 +37,7 @@ public:
 	// Constructor. We use values of -1 for attributes that, at the start of
 	// the program, have no meaningful/"true" value.
 	Callbacks3D(ShaderProgram &lightingShader, ShaderProgram &noLightingShader, ShaderProgram &pickerShader, Camera &camera, int screenWidth, int screenHeight)
-		: lightingShader(lightingShader), noLightingShader(noLightingShader), pickerShader(pickerShader), camera(camera), rightMouseDown(false), leftMouseDown(false), mouseOldX(-1.0), mouseOldY(-1.0), screenWidth(screenWidth), screenHeight(screenHeight), aspect(screenWidth / screenHeight)
+		: lightingShader(lightingShader), noLightingShader(noLightingShader), pickerShader(pickerShader), camera(camera), rightMouseDown(false), leftMouseDown(false), lastLeftPressedFrame(-1), mouseOldX(-1.0), mouseOldY(-1.0), screenWidth(screenWidth), screenHeight(screenHeight), aspect(screenWidth / screenHeight)
 	{
 		updateUniformLocations();
 	}
@@ -79,10 +79,23 @@ public:
 		if (button == GLFW_MOUSE_BUTTON_LEFT)
 		{
 			if (action == GLFW_PRESS)
+			{
 				leftMouseDown = true;
+				lastLeftPressedFrame = currentFrame;
+			}
 			else if (action == GLFW_RELEASE)
 				leftMouseDown = false;
 		}
+	}
+
+	bool leftMouseJustPressed()
+	{
+		return lastLeftPressedFrame == currentFrame;
+	}
+
+	void incrementFrameCount()
+	{
+		currentFrame++;
 	}
 
 	// Updates the screen width and height, in screen coordinates
@@ -170,8 +183,34 @@ public:
 		return glm::vec2(mouseOldX, mouseOldY);
 	}
 
+	int indexOfPointAtCursorPos(std::vector<Vertex> &glCoordsOfPointsToSearch, glm::vec2 cursorPos, float screenCoordThreshold, Camera current)
+	{
+
+		std::vector<glm::vec3> screenCoordVerts;
+		for (const auto &v : glCoordsOfPointsToSearch)
+		{
+			screenCoordVerts.push_back(glm::vec3(glPosToScreenCoords(current.getMousePos(glm::vec4(v.position, 1.f))), 0.f));
+		}
+
+		glm::vec2 screenMouse = glPosToScreenCoords(cursorPos);
+		glm::vec3 cursorPosScreen(screenMouse.x + 0.5f, screenMouse.y + 0.5f, 0.f);
+
+		for (size_t i = 0; i < screenCoordVerts.size(); i++)
+		{
+			// Return i if length of difference vector within threshold.
+			glm::vec3 diff = screenCoordVerts[i] - cursorPosScreen;
+			if (glm::length(diff) < screenCoordThreshold)
+			{
+				return i;
+			}
+		}
+		return -1; // No point within threshold found.
+	}
+
 	bool rightMouseDown;
 	bool leftMouseDown;
+	int currentFrame;
+	int lastLeftPressedFrame;
 
 private:
 	// Uniform locations do not, ordinarily, change between frames.
@@ -225,6 +264,16 @@ private:
 	ShaderProgram &noLightingShader;
 	ShaderProgram &pickerShader;
 	Camera &camera;
+
+	glm::vec2 glPosToScreenCoords(glm::vec2 glPos)
+	{
+		// Convert the [-1, 1] range to [0, 1]
+		glm::vec2 scaledZeroOne = 0.5f * (glPos + glm::vec2(1.f, 1.f));
+
+		glm::vec2 flippedY = glm::vec2(scaledZeroOne.x, 1.0f - scaledZeroOne.y);
+		glm::vec2 screenPos = flippedY * glm::vec2(screenWidth, screenHeight);
+		return screenPos;
+	}
 };
 
 std::vector<Line> generateAxisLines()
@@ -413,12 +462,22 @@ int main()
 
 	glm::vec3 lineColor{0.0f, 1.0f, 0.0f};
 	std::vector<Line> lines;
+	std::vector<Line> points;
+
+	Line *pointsInProgress = nullptr;
 	Line *lineInProgress = nullptr;
 	float pointEpsilon = 0.01f;
 
 	glm::vec3 boundColor{1.0f, 0.7f, 0.0f};
 	std::vector<Line> bounds;
 	Line *boundInProgress = nullptr;
+
+	glm::vec3 black{0.f, 0.f, 0.f};
+	float pointSize = 5.0f;
+	int selectedPointIndex = -1; // Used for point dragging & deletion
+	glm::vec2 editing = glm::vec2(-1, -1);
+
+	int precision = 300;
 
 	// std::vector<Line> pinch;
 	// pinch.push_back(Line());
@@ -450,6 +509,7 @@ int main()
 	// RENDER LOOP
 	while (!window.shouldClose())
 	{
+		cb->incrementFrameCount();
 		glfwPollEvents();
 
 		// Detect Hovered Objects in FREE_VIEW
@@ -469,9 +529,7 @@ int main()
 		// Line Drawing Logic. Max 2 lines can be drawn at a time. Only in DRAW_VIEW
 		if (view == DRAW_VIEW && cb->leftMouseDown)
 		{
-			float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
-			glm::vec4 cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
-			cursorPos = glm::inverse(cam.getView()) * cursorPos;
+			glm::vec4 cursorPos = cam.getCursorPos(cb->getCursorPosGL());
 
 			if (lineInProgress)
 			{
@@ -501,11 +559,44 @@ int main()
 		{
 			if (lineInProgress != nullptr)
 			{
-				lineInProgress->ChaikinAlg(1, lineColor);
+				points.emplace_back(Line(lineInProgress->verts));
+				pointsInProgress = &points.back();
+				pointsInProgress->ChaikinAlg(2, black);
+
+				lineInProgress->verts = (pointsInProgress->BSpline(precision, lineColor));
+
 				lineInProgress->updateGPU();
+				pointsInProgress->updateGPU();
+
 				lineInProgress = nullptr;
+				pointsInProgress = nullptr;
 			}
 		}
+
+		// POINT SELECTION (IN EDIT MODE ONLY)
+		if (inEditMode && cb->leftMouseJustPressed())
+		{
+			float threshold = pointSize;
+			for (int i = 0; i < points.size(); i++)
+			{
+				selectedPointIndex = cb->indexOfPointAtCursorPos(points[i].verts, cb->getCursorPosGL(), threshold, cam);
+				if (selectedPointIndex != -1)
+				{
+					editing = glm::vec2(i, selectedPointIndex);
+				}
+			}
+		}
+		if (inEditMode && cb->leftMouseDown && editing.y >= 0)
+		{
+			// Drag selected point.
+			points[editing.x].verts[editing.y].position = cam.getCursorPos(cb->getCursorPosGL());
+			points[editing.x].updateGPU();
+
+			lines[editing.x].verts = points[editing.x].BSpline(precision, lineColor);
+			lines[editing.x].updateGPU();
+		}
+
+		// std::cout << editing.y << std::endl;
 
 		// Start ImGui Frame
 		ImGui_ImplOpenGL3_NewFrame();
@@ -553,6 +644,12 @@ int main()
 				view = FREE_VIEW;
 				change = true;
 				lines.clear();
+				points.clear();
+			}
+			if (ImGui::Button("Edit Mode"))
+			{
+				inDrawMode = false;
+				inEditMode = true;
 			}
 
 			ImGui::Text("");
@@ -793,6 +890,33 @@ int main()
 			}
 			cb->updateShadingUniforms(lightPos, d, a);
 			meshes[i].draw();
+		}
+
+		// Drawing Lines (no Lighting)
+		noLightingShader.use();
+		cb->noLightingViewPipeline();
+		if (view == DRAW_VIEW || view == EDIT_VIEW)
+		{
+			for (Line &line : lines)
+			{
+				line.draw(noLightingShader);
+			}
+		}
+
+		if (inDrawMode || inEditMode)
+		{
+			for (Line &line : lines)
+			{
+				line.draw(noLightingShader);
+			}
+		}
+
+		if (view == EDIT_VIEW)
+		{
+			for (Line &set : points)
+			{
+				set.drawPoints(pointSize, noLightingShader);
+			}
 		}
 
 		// Drawing Lines (no Lighting)

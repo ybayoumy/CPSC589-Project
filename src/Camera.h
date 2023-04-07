@@ -19,6 +19,9 @@ public:
 	glm::mat4 getView();
 	glm::vec3 getPos();
 	glm::vec3 getUp();
+	glm::vec4 getCursorPos(glm::vec2 mouseIn);
+	glm::vec2 getMousePos(glm::vec4 cursorIn);
+
 	std::vector<Vertex> getcircle(int inc);
 	std::vector<Vertex> standardize(std::vector<Vertex>);
 	
