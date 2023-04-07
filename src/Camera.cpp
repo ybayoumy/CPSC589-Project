@@ -40,6 +40,21 @@ glm::vec3 Camera::getUp() {
 	return glm::normalize(glm::vec3(-std::sin(phi) * std::sin(theta), std::cos(theta), -std::cos(phi) * std::sin(theta)));
 }
 
+glm::vec4 Camera::getCursorPos(glm::vec2 mouseIn) {
+	float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * radius;
+	glm::vec4 cursorPos = glm::vec4(mouseIn * perspectiveMultiplier, -radius, 1.0f);
+	cursorPos = glm::inverse(getView()) * cursorPos;
+
+	return cursorPos;
+}
+
+glm::vec2 Camera::getMousePos(glm::vec4 cursorIn) {
+	glm::vec4 mousePos = getView() * cursorIn;
+	float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * radius;
+	mousePos = (1/perspectiveMultiplier) * mousePos;
+	return mousePos;
+}
+
 void Camera::incrementTheta(float dt) {
 	if (isFixed) return;
 
