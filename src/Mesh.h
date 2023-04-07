@@ -58,8 +58,6 @@ public:
 	std::vector<Vertex> verts;
 	std::vector<unsigned int> indices;
 
-	glm::vec3 color;
-
 	Line bound1;
 	Line bound2;
 
@@ -75,7 +73,7 @@ public:
 
 	GPU_Geometry geometry;
 
-	void create(int sprecision) {
+	void create(int sprecision, glm::vec3 color) {
 		verts.clear();
 		indices.clear();
 
@@ -235,13 +233,14 @@ public:
 	}
 
 	void setColor(glm::vec3 col) {
-		color = col;
+		for (auto i = verts.begin(); i < verts.end(); i++) {
+			(*i).color = col;
+		}
 	}
 
 	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)
 		: verts(v)
 		, indices(i)
-		, color(glm::vec3(1.f, 0.f, 0.f))
 		, bound1()
 		, bound2()
 		, sweep()
@@ -253,7 +252,6 @@ public:
 	Mesh()
 		: verts()
 		, indices()
-		, color(glm::vec3(1.f, 0.f, 0.f))
 		, bound1()
 		, bound2()
 		, sweep()

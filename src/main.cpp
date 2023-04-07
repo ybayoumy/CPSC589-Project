@@ -312,7 +312,7 @@ int main() {
 	std::vector<Mesh> meshes;
 	Mesh* meshInProgress = nullptr;
 
-	glm::vec3 lineColor{ 0.0f, 1.0f, 0.0f };
+	glm::vec3 lineColor{ 0.0f, 1.0f, 0.7f };
 	std::vector<Line> lines;
 	std::vector<Line> points;
 
@@ -496,6 +496,8 @@ int main() {
 			if (ImGui::Button("Clear Lines")) {
 				lines.clear();
 			}
+
+			ImGui::ColorEdit3("New Object Color", (float*)&lineColor);
 		}
 
 		//if (meshes.size() > 0) {
@@ -546,7 +548,7 @@ int main() {
 				points.pop_back();
 				meshInProgress->sweep = cam.getcircle(50);
 				meshInProgress->cam = cam;
-				meshInProgress->create(precision);
+				meshInProgress->create(precision, lineColor);
 				meshInProgress->updateGPU();
 
 				bounds.emplace_back();
