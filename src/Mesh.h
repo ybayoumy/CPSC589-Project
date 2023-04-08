@@ -227,6 +227,12 @@ public:
 
 	void setColor(glm::vec3 col) {
 		color = col;
+
+		for (Vertex& v : verts) {
+			v.color = color;
+		}
+
+		updateGPU();
 	}
 
 	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)

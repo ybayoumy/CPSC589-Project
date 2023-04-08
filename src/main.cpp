@@ -459,6 +459,7 @@ int main() {
 
 	int hoveredObjectIndex = -1;
 	int selectedObjectIndex = -1;
+	glm::vec3 meshCol;
 
 	enum ViewType { FREE_VIEW, DRAW_VIEW, OBJECT_VIEW };
 	ViewType view = FREE_VIEW;
@@ -475,6 +476,7 @@ int main() {
 		if (hoveredObjectIndex >= 0 && cb->leftMouseDown) {
 			selectedObjectIndex = hoveredObjectIndex;
 			view = OBJECT_VIEW;
+			meshCol = meshes[selectedObjectIndex].color;
 		}
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time. Only in DRAW_VIEW
@@ -616,7 +618,10 @@ int main() {
 			std::string frameTitle = "Object View - Object " + std::to_string(selectedObjectIndex);
 			ImGui::Begin(frameTitle.c_str());
 
-
+			ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
+			if (ImGui::Button("Apply Color")) {
+				meshes[selectedObjectIndex].setColor(meshCol);
+			}
 
 			ImGui::Text("");
 			if (ImGui::Button("Delete")) {
