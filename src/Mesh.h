@@ -213,8 +213,7 @@ public:
 
 	}
 
-	void draw(ShaderProgram& shader) {
-		shader.use();
+	void draw() {
 		geometry.bind();
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);

@@ -85,15 +85,13 @@ public:
 	GPU_Geometry geometry;
 	bool standardized;
 
-	void draw(ShaderProgram& shader) {
-		shader.use();
+	void draw() {
 		geometry.bind();
 		glDrawArrays(GL_LINE_STRIP, 0, GLsizei(verts.size()));
 		glBindVertexArray(0);
 	}
 
-	void drawPoints(float pointSize, ShaderProgram& shader) {
-		shader.use();
+	void drawPoints(float pointSize) {
 		geometry.bind();
 		glPointSize(pointSize);
 		glDrawArrays(GL_POINTS, 0, GLsizei(verts.size()));

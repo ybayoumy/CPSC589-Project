@@ -23,6 +23,9 @@
 #include "Mesh.h"
 #include "Line.h"
 
+#include "Renderbuffer.h"
+#include "Framebuffer.h"
+
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
@@ -60,8 +63,10 @@ class Callbacks3D : public CallbackInterface {
 public:
 	// Constructor. We use values of -1 for attributes that, at the start of
 	// the program, have no meaningful/"true" value.
-	Callbacks3D(ShaderProgram& shader, Camera& camera, int screenWidth, int screenHeight)
-		: shader(shader)
+	Callbacks3D(ShaderProgram& lightingShader, ShaderProgram& noLightingShader, ShaderProgram& pickerShader, Camera& camera, int screenWidth, int screenHeight)
+		: lightingShader(lightingShader)
+		, noLightingShader(noLightingShader)
+		, pickerShader(pickerShader)
 		, camera(camera)
 		, rightMouseDown(false)
 		, leftMouseDown(false)
@@ -74,9 +79,16 @@ public:
 		updateUniformLocations();
 	}
 
+	void updateIDUniform(int idToRender) {
+		// Like viewPipelinePicker(), this function assumes pickerShader.use() was called before.
+		glUniform1i(pickerIDLoc, idToRender);
+	}
+
 	virtual void keyCallback(int key, int scancode, int action, int mods) {
 		if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-			shader.recompile();
+			lightingShader.recompile();
+			noLightingShader.recompile();
+			pickerShader.recompile();
 			updateUniformLocations();
 		}
 	}
@@ -122,13 +134,32 @@ public:
 		camera.incrementR(yoffset);
 	}
 
-	void viewPipeline() {
+	void lightingViewPipeline() {
 		glm::mat4 M = glm::mat4(1.0);
 		glm::mat4 V = camera.getView();
 		glm::mat4 P = glm::perspective(glm::radians(45.0f), aspect, 0.01f, 1000.f);
-		glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(M));
-		glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(V));
-		glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(P));
+		glUniformMatrix4fv(lightingMLoc, 1, GL_FALSE, glm::value_ptr(M));
+		glUniformMatrix4fv(lightingVLoc, 1, GL_FALSE, glm::value_ptr(V));
+		glUniformMatrix4fv(lightingPLoc, 1, GL_FALSE, glm::value_ptr(P));
+	}
+
+	void noLightingViewPipeline() {
+		glm::mat4 M = glm::mat4(1.0);
+		glm::mat4 V = camera.getView();
+		glm::mat4 P = glm::perspective(glm::radians(45.0f), aspect, 0.01f, 1000.f);
+		glUniformMatrix4fv(noLightingMLoc, 1, GL_FALSE, glm::value_ptr(M));
+		glUniformMatrix4fv(noLightingVLoc, 1, GL_FALSE, glm::value_ptr(V));
+		glUniformMatrix4fv(noLightingPLoc, 1, GL_FALSE, glm::value_ptr(P));
+	}
+
+	void viewPipelinePicker() {
+		glm::mat4 M = glm::mat4(1.0);
+		glm::mat4 V = camera.getView();
+		glm::mat4 P = glm::perspective(glm::radians(45.0f), aspect, 0.01f, 1000.f);
+
+		glUniformMatrix4fv(mLocPicker, 1, GL_FALSE, glm::value_ptr(M));
+		glUniformMatrix4fv(vLocPicker, 1, GL_FALSE, glm::value_ptr(V));
+		glUniformMatrix4fv(pLocPicker, 1, GL_FALSE, glm::value_ptr(P));
 	}
 
 	void updateShadingUniforms(
@@ -156,6 +187,10 @@ public:
 		return 2.f * flippedY - glm::vec2(1.f, 1.f);
 	}
 
+	glm::vec2 cursorPosScreenCoords() {
+		return glm::vec2(mouseOldX, mouseOldY);
+	}
+
 	bool rightMouseDown;
 	bool leftMouseDown;
 
@@ -163,12 +198,22 @@ private:
 	// Uniform locations do not, ordinarily, change between frames.
 	// However, we may need to update them if the shader is changed and recompiled.
 	void updateUniformLocations() {
-		mLoc = glGetUniformLocation(shader, "M");
-		vLoc = glGetUniformLocation(shader, "V");
-		pLoc = glGetUniformLocation(shader, "P");
-		lightPosLoc = glGetUniformLocation(shader, "lightPos");
-		lightColLoc = glGetUniformLocation(shader, "lightCol");
-		ambientStrengthLoc = glGetUniformLocation(shader, "ambientStrength");
+		lightPosLoc = glGetUniformLocation(lightingShader, "lightPos");
+		lightColLoc = glGetUniformLocation(lightingShader, "lightCol");
+		ambientStrengthLoc = glGetUniformLocation(lightingShader, "ambientStrength");
+
+		lightingMLoc = glGetUniformLocation(lightingShader, "M");
+		lightingVLoc = glGetUniformLocation(lightingShader, "V");
+		lightingPLoc = glGetUniformLocation(lightingShader, "P");
+
+		noLightingMLoc = glGetUniformLocation(noLightingShader, "M");
+		noLightingVLoc = glGetUniformLocation(noLightingShader, "V");
+		noLightingPLoc = glGetUniformLocation(noLightingShader, "P");
+
+		mLocPicker = glGetUniformLocation(pickerShader, "M");
+		vLocPicker = glGetUniformLocation(pickerShader, "V");
+		pLocPicker = glGetUniformLocation(pickerShader, "P");
+		pickerIDLoc = glGetUniformLocation(pickerShader, "objIndex");
 	}
 
 	int screenWidth;
@@ -179,14 +224,26 @@ private:
 	double mouseOldY;
 
 	// Uniform locations
-	GLint mLoc;
-	GLint vLoc;
-	GLint pLoc;
 	GLint lightPosLoc;
 	GLint lightColLoc;
 	GLint ambientStrengthLoc;
 
-	ShaderProgram& shader;
+	GLint lightingMLoc;
+	GLint lightingVLoc;
+	GLint lightingPLoc;
+
+	GLint noLightingMLoc;
+	GLint noLightingVLoc;
+	GLint noLightingPLoc;
+
+	GLint mLocPicker;
+	GLint vLocPicker;
+	GLint pLocPicker;
+	GLint pickerIDLoc;
+
+	ShaderProgram& lightingShader;
+	ShaderProgram& noLightingShader;
+	ShaderProgram& pickerShader;
 	Camera& camera;
 };
 
@@ -262,6 +319,57 @@ bool exportToObj(std::string filename, std::vector<Mesh>& meshes) {
 	}
 }
 
+int findSelectedObjectIndex(
+	Framebuffer& pickerFB, 
+	Texture& pickerTex, 
+	ShaderProgram& pickerShader, 
+	std::shared_ptr<Callbacks3D> cb, 
+	Window& window, 
+	std::vector<Mesh>& meshes
+) {
+	int pickerClearValue[4] = { 0, 0, 0, 0 };
+
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_FRAMEBUFFER_SRGB);
+	glEnable(GL_DEPTH_TEST);
+
+	pickerFB.bind();
+
+	glDisable(GL_DITHER);
+	glClearBufferiv(GL_COLOR, 0, pickerClearValue);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+
+	const glm::ivec2 fbSize = window.getFramebufferSize();
+	const glm::ivec2 winSize = window.getSize();
+
+	const glm::ivec2 pickPosFlipped = glm::ivec2(cb->cursorPosScreenCoords()) * (fbSize / winSize);
+	const glm::ivec2 pickPos(pickPosFlipped.x, fbSize.y - pickPosFlipped.y);
+
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(pickPos.x, pickPos.y, 1, 1);
+
+	pickerShader.use();
+	cb->viewPipelinePicker();
+	for (int i = 0; i < meshes.size(); i++) {
+		cb->updateIDUniform(i + 1);
+		meshes[i].draw();
+	}
+
+	pickerTex.bind();
+	GLint pickTexCPU[1];
+	glReadPixels(pickPos.x, pickPos.y, 1, 1, GL_RED_INTEGER, GL_INT, pickTexCPU);
+
+	// Binds the "0" default framebuffer, which we use for our visual result.
+	pickerFB.unbind();
+
+	// Reset changed settings to default for the main visual render.
+	glEnable(GL_DITHER);
+	glDisable(GL_SCISSOR_TEST);
+
+	return pickTexCPU[0] - 1;
+}
+
 int main() {
 	Log::debug("Starting main");
 
@@ -274,15 +382,35 @@ int main() {
 	// SHADERS
 	ShaderProgram lightingShader("shaders/lighting3D.vert", "shaders/lighting3D.frag");
 	ShaderProgram noLightingShader("shaders/nolighting3D.vert", "shaders/nolighting3D.frag");
+	ShaderProgram pickerShader("shaders/nolighting3D.vert", "shaders/picker.frag");
 
 	Camera cam(glm::radians(0.f), glm::radians(0.f), 3.0);
 	cam.fix();
-	auto cb = std::make_shared<Callbacks3D>(lightingShader, cam, window.getWidth(), window.getHeight());
+	auto cb = std::make_shared<Callbacks3D>(lightingShader, noLightingShader, pickerShader, cam, window.getWidth(), window.getHeight());
 
 	// CALLBACKS
 	window.setCallbacks(cb);
 
 	window.setupImGui(); // Make sure this call comes AFTER GLFW callbacks set.
+
+	// OBJECT SELECTION SETUP
+	const glm::ivec2 fbSize = window.getFramebufferSize();
+
+	Texture pickerTex(0, GL_R32I, fbSize.x, fbSize.y, GL_RED_INTEGER, GL_INT, GL_NEAREST);
+
+	Renderbuffer pickerRB;
+	pickerRB.setStorage(GL_DEPTH_COMPONENT24, fbSize.x, fbSize.y);
+
+	Framebuffer pickerFB;
+	pickerFB.addTextureAttachment(GL_COLOR_ATTACHMENT0, pickerTex);
+	pickerFB.addRenderbufferAttachment(GL_DEPTH_ATTACHMENT, pickerRB);
+
+	auto fbStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (fbStatus != GL_FRAMEBUFFER_COMPLETE)
+	{
+		Log::error("Error creating framebuffer : {}", fbStatus);
+		throw std::runtime_error("Framebuffer creation error!");
+	}
 
 	glm::vec3 lightPos(0.f, 35.f, 35.f);
 	glm::vec3 lightCol(1.f);
@@ -332,9 +460,14 @@ int main() {
 	char ObjFilename[] = "";
 	std::string lastExportedFilename = "";
 
+	int hoveredObjectIndex = -1;
+
 	// RENDER LOOP
 	while (!window.shouldClose()) {
 		glfwPollEvents();
+
+		if (!inDrawMode) hoveredObjectIndex = findSelectedObjectIndex(pickerFB, pickerTex, pickerShader, cb, window, meshes);
+		else hoveredObjectIndex = -1;
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time
 		if (inDrawMode && cb->leftMouseDown) {
@@ -584,19 +717,20 @@ int main() {
 			}
 		}
 
+		// RENDERING
 		glEnable(GL_LINE_SMOOTH);
 		glEnable(GL_FRAMEBUFFER_SRGB);
-		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glEnable(GL_DEPTH_TEST);
 		glPolygonMode(GL_FRONT_AND_BACK, (simpleWireframe ? GL_LINE : GL_FILL) );
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Drawing Axis Lines (no Lighting)
 		if (showAxes) {
 			noLightingShader.use();
-			cb->viewPipeline();
+			cb->noLightingViewPipeline();
 			for (Line& line : axisLines) {
-				line.draw(noLightingShader);
+				line.draw();
 			}
 		}
 
@@ -606,22 +740,24 @@ int main() {
 		{
 			cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 		}
-		cb->viewPipeline();
+		cb->lightingViewPipeline();
 		for (Mesh& mesh : meshes) {
-			mesh.draw(lightingShader);
+			mesh.draw();
 		}
 		
 		// Drawing Lines (no Lighting)
 		noLightingShader.use();
-		cb->viewPipeline();
+		cb->noLightingViewPipeline();
 		for (Line& line : lines) {
-			line.draw(noLightingShader);
+			line.draw();
 		}
 
 		// Drawing Lines (no Lighting)
 		if (showbounds) {
+			noLightingShader.use();
+			cb->noLightingViewPipeline();
 			for (Line& bound : bounds) {
-				bound.draw(noLightingShader);
+				bound.draw();
 			}
 		}
 
