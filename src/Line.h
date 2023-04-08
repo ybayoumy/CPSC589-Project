@@ -135,6 +135,12 @@ public:
 		glBindVertexArray(0);
 	}
 
+	void setColor(glm::vec3 mycolor) {
+		for (auto i = verts.begin(); i < verts.end(); i++) {
+			(*i).color = mycolor;
+		}
+	}
+
 	void ChaikinAlg(int iter, glm::vec3 color) {
 		glm::vec3 newpoint;
 		std::vector<Vertex> Chaikin;
@@ -182,6 +188,33 @@ public:
 		}
 
 		return spline;
+	}
+
+	void getCrossSection(Camera current, glm::vec3 color) {
+
+		glm::vec3 p1 = verts[0].position;
+		glm::vec3 p2 = verts.back().position;
+
+		glm::vec3 center = 0.5f * (p1 + p2);
+		glm::vec3 d = p2 - p1;
+		float dtheta = glm::orientedAngle(glm::normalize(current.getUp()), glm::normalize(d), -glm::normalize(current.getPos()));
+
+		glm::mat4 T1 = glm::translate(glm::mat4(1.f), -center);
+		glm::mat4 R1 = glm::rotate(glm::mat4(1.f), -dtheta, -current.getPos());
+		glm::mat4 S1 = glm::scale(glm::mat4(1.f), glm::vec3(-1.f, 1.f, 0.f));
+		glm::mat4 S2 = glm::scale(glm::mat4(1.f), glm::vec3(2 / glm::length(d), 2 / glm::length(d), 0.f));
+
+		std::vector<Vertex> temp = verts;
+		verts.clear();
+		for (int i = 0; i < temp.size() - 1; i++) {
+			glm::vec3 newp = (S2 * R1 * T1 * glm::vec4(temp[i].position, 1.f));
+			verts.push_back(Vertex{ newp, color, glm::vec3(0.f, 0.f, 0.f) });
+		}
+		for (int i = temp.size() - 1; i >= 0; i--) {
+			glm::vec3 newp2 = (S2 * S1 * R1 * T1 * glm::vec4(temp[i].position, 1.f));
+			verts.push_back(Vertex{ newp2, color, glm::vec3(0.f, 0.f, 0.f) });
+		}
+
 	}
 
 	int match(glm::vec3 cursorPos, Camera current) {

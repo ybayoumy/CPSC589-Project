@@ -117,7 +117,11 @@ public:
 
 	std::vector<Vertex> verts;
 	std::vector<unsigned int> indices;
+	
 	std::vector<Line> discs;
+	std::vector<Line> defdiscs;
+
+	bool init;
 
 	Line bound1;
 	Line bound2;
@@ -127,6 +131,8 @@ public:
 	std::vector<int> sweepindex;
 
 	Line axis;
+
+	Line crosssection;
 
 	glm::vec3 mycolor;
 
@@ -143,6 +149,7 @@ public:
 	void create(int sprecision, glm::vec3 color) {
 		verts.clear();
 		indices.clear();
+		discs.clear();
 
 		mycolor = color;
 	
@@ -229,6 +236,19 @@ public:
 				asweep.emplace_back(Vertex{ glm::vec4(point, 1.f), glm::vec3(1.f) - color, normal });
 			}
 
+
+			if (!init) {
+				if (i == 0) {
+					defdiscs.emplace_back(Line(asweep));
+					sweepindex[1] = i;
+				}
+				if (i == sprecision) {
+					defdiscs.emplace_back(Line(asweep));
+					sweepindex[2] = i+1;
+					init = true;
+				}
+			}
+
 			discs.emplace_back(Line(asweep));
 
 			if (i == sprecision) {
@@ -242,6 +262,30 @@ public:
 	}
 
 	//std::vector<Vertex> getdisc(glm::vec3 position1, glm::vec3 position2, )
+
+	glm::vec3 getAxis() {
+		glm::vec3 avgaxis = axis.verts.back().position - axis.verts[0].position;
+		return glm::normalize(avgaxis);
+	}
+
+	glm::vec3 getPoint(glm::vec3 fix) {
+		glm::vec3 y = fix * axis.verts[0].position;
+		glm::vec3 m = fix * getAxis();
+
+		float t = (-(y.x + y.y + y.z)) / (m.x + m.y + m.z);
+		glm::vec3 point = getAxis() * t + axis.verts[0].position;
+		return point;
+	}
+
+	void setcrosssection(std::vector<Vertex> cross) {
+		crosssection = cross;
+		
+		Line temp;
+		temp = Line(cross);
+		temp.getCrossSection(cam, glm::vec3(0.f, 0.f, 0.f));
+		sweep = cam.standardize(temp.verts);
+
+	}
 
 	void draw(ShaderProgram& shader) {
 		shader.use();
@@ -272,6 +316,7 @@ public:
 		, sweep()
 		, sweepindex({0,0,0,0})
 		, mycolor (0,0,0)
+		, init(false)
 		//, pinch1()
 		//, pinch2()
 		, cam(c)
@@ -286,6 +331,7 @@ public:
 		, sweep()
 		, sweepindex({ 0,0,0,0 })
 		, mycolor(0, 0, 0)
+		, init(false)
 		//, pinch1()
 		//, pinch2()
 		, cam(0, 0, 1)

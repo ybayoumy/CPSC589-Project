@@ -89,7 +89,7 @@ std::vector<Vertex> Camera::getcircle(int inc) {
 	glm::vec3 up = getUp();
 
 	std::vector<Vertex> circle;
-	for (int i = 0; i < inc; i++) {
+	for (int i = 0; i <= inc; i++) {
 		float angle = i * 2 * M_PI / inc;
 		glm::vec3 point = glm::rotate(glm::mat4(1.f), -float(M_PI) / 2, up) * glm::inverse(glm::lookAt(eye, at, glm::vec3(0.f, 1.f, 0.f))) * glm::vec4(cos(angle), sin(angle), -radius, 1.f);
 		circle.push_back(Vertex{point, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
@@ -97,55 +97,47 @@ std::vector<Vertex> Camera::getcircle(int inc) {
 	return circle;
 }
 
-std::vector<Vertex> Camera::standardize(std::vector<Vertex> line) {
-	std::vector<Vertex> temp;
-	temp = line;
-
+std::vector<Vertex> Camera::getthincircle(int inc) {
 	glm::vec3 eye = radius * glm::vec3(std::cos(theta) * std::sin(phi), std::sin(theta), std::cos(theta) * std::cos(phi));
 	glm::vec3 at = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3 up = getUp();
 
-	line.clear();
-	for (int j = 0; j < temp.size(); j++) {
-		// GET POINTS INTO XY PLANE
-		glm::vec3 newvert = getView() * glm::vec4(temp[j].position, 1.f);
-		line.push_back(Vertex{ newvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
+	std::vector<Vertex> circle;
+	for (int i = 0; i <= inc; i++) {
+		float angle = i * 2 * M_PI / inc;
+		glm::vec3 point = glm::rotate(glm::mat4(1.f), -float(M_PI) / 2, up) * glm::inverse(glm::lookAt(eye, at, glm::vec3(0.f, 1.f, 0.f))) * glm::vec4(0.5f * cos(angle), sin(angle), -radius, 1.f);
+		circle.push_back(Vertex{ point, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
 	}
+	return circle;
+}
 
-	std::sort(temp.begin(), temp.end(), xdescend);
+glm::vec4 Camera::drawonplane(glm::vec2 mouseIn, glm::vec3 axis, glm::vec3 point, glm::vec3 fixed) {
+	glm::vec3 nochange = fixed - glm::normalize(glm::abs(getPos()));
+	glm::vec3 ref = fixed - nochange;
 
-	glm::vec3 xmax = temp[0].position;
-	glm::vec3 xmin = temp.back().position;
+	glm::vec4 cursorPos = getCursorPos(mouseIn);
+	//float t = (glm::length(glm::vec4(nochange, 1.f) * cursorPos) / glm::length(nochange * drawaxis));
 
-	std::sort(temp.begin(), temp.end(), ydescend);
+	glm::vec3 y = glm::vec4(nochange, 1.f) * cursorPos;
+	glm::vec3 m = nochange * axis;
 
-	glm::vec3 ymax = temp[0].position;
-	glm::vec3 ymin = temp.back().position;
+	float t = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+	float disttoaxis = glm::distance(ref * getPos(), ref * (point + axis * t));
 
-	glm::vec3 center;
-	glm::vec3 newcenter;
+	cursorPos = glm::vec4(mouseIn * glm::tan(glm::radians(22.5f)) * disttoaxis, -disttoaxis, 1.0f);
+	cursorPos = glm::inverse(getView()) * cursorPos;
 
-	//newcenter = 0.5f * (xmin + xmax);
+	return cursorPos;
+}
 
-	if (glm::vec3(0.f, 1.f, 0.f).y != 0) {
-		center = 0.25f * (xmin + xmax + ymin + ymax);
-	}
+std::vector<Vertex> Camera::standardize(std::vector<Vertex> myverts) {
+	std::vector<Vertex> temp;
 
-	float yd = fabs(ymax.y - ymin.y);
-
-	temp = line;
-	line.clear();
-	for (int j = 0; j < temp.size(); j++) {
-		// MOVE AND SCALE
-		//glm::translate(glm::mat4(1.f), newcenter - center) * 
-		glm::vec3 newvert = glm::scale(glm::mat4(1.f), glm::vec3(2 / yd, 2 / yd, 0)) * glm::translate(glm::mat4(1.f), -center) * glm::vec4(temp[j].position, 1.f);
-		// PUSH TO SCREEN
-		newvert = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, -radius)) * glm::vec4(newvert, 1.f);
+	for (auto j = myverts.begin(); j < myverts.end(); j++) {
 		// ROTATE W.R.T AXIS
-		newvert = glm::rotate(glm::mat4(1.f), float(M_PI_2), up) * glm::inverse(glm::lookAt(eye, at, glm::vec3(0.f, 1.f, 0.f))) * glm::vec4(newvert, 1.f);
-		
-		line.push_back(Vertex{ newvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
+		glm::vec3 newvert = glm::rotate(glm::mat4(1.f), float(M_PI_2), getUp()) * glm::vec4((*j).position, 1.f);
+		temp.push_back(Vertex{ newvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
 	}
 
-	return line;
+	return temp;
 }

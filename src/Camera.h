@@ -22,7 +22,10 @@ public:
 	glm::vec4 getCursorPos(glm::vec2 mouseIn);
 	glm::vec2 getMousePos(glm::vec4 cursorIn);
 
+	glm::vec4 drawonplane(glm::vec2 mouseIn, glm::vec3 axis, glm::vec3 point, glm::vec3 fixed);
+
 	std::vector<Vertex> getcircle(int inc);
+	std::vector<Vertex> getthincircle(int inc);
 	std::vector<Vertex> standardize(std::vector<Vertex>);
 	
 	void incrementTheta(float dt);
