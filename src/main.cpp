@@ -305,29 +305,42 @@ int main() {
 	cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
 
 	std::vector<Line> axisLines = generateAxisLines();
+<<<<<<< Updated upstream
 	for (Line& line : axisLines) {
+=======
+	for (Line& line : axisLines)
+	{
+>>>>>>> Stashed changes
 		line.updateGPU();
 	}
 
 	std::vector<Mesh> meshes;
 	Mesh* meshInProgress = nullptr;
 
+<<<<<<< Updated upstream
 	glm::vec3 lineColor{ 0.0f, 1.0f, 0.7f };
 	std::vector<Line> lines;
 	std::vector<Line> points;
 
 	Line* pointsInProgress = nullptr;
+=======
+	glm::vec3 lineColor{ 0.0f, 1.0f, 0.0f };
+	std::vector<Line> lines;
+>>>>>>> Stashed changes
 	Line* lineInProgress = nullptr;
 	float pointEpsilon = 0.01f;
 
 	glm::vec3 boundColor{ 1.0f, 0.7f, 0.0f };
 	std::vector<Line> bounds;
 	Line* boundInProgress = nullptr;
+<<<<<<< Updated upstream
 	
 	glm::vec3 black{ 0.f, 0.f, 0.f };
 	float pointSize = 5.0f;
 	int selectedPointIndex = -1; // Used for point dragging & deletion
 	glm::vec2 editing = glm::vec2(-1, -1);
+=======
+>>>>>>> Stashed changes
 
 	int precision = 150;
 
@@ -348,6 +361,24 @@ int main() {
 	char ObjFilename[] = "";
 	std::string lastExportedFilename = "";
 
+<<<<<<< Updated upstream
+=======
+	int hoveredObjectIndex = -1;
+	int selectedObjectIndex = -1;
+	glm::vec3 meshCol;
+
+	enum ViewType
+	{
+		FREE_VIEW,
+		DRAW_VIEW,
+		OBJECT_VIEW,
+		SKETCH_VIEW,
+		PROFILE_VIEW,
+		CROSS_VIEW
+	};
+	ViewType view = FREE_VIEW;
+
+>>>>>>> Stashed changes
 	// RENDER LOOP
 	while (!window.shouldClose()) {
 
@@ -375,7 +406,11 @@ int main() {
 			}
 			else if (lines.size() < 2) {
 				// create a new line
+<<<<<<< Updated upstream
 				lines.emplace_back(std::vector<Vertex>{ Vertex{ cursorPos, lineColor, glm::vec3(0.0f) } });
+=======
+				lines.emplace_back(std::vector<Vertex>{Vertex{ cursorPos, lineColor, glm::vec3(0.0f) }});
+>>>>>>> Stashed changes
 				lineInProgress = &lines.back();
 				lineInProgress->updateGPU();
 			}
@@ -397,6 +432,7 @@ int main() {
 		}
 		
 
+<<<<<<< Updated upstream
 		// POINT SELECTION (IN EDIT MODE ONLY)
 		if (inEditMode && cb->leftMouseJustPressed()) {
 			float threshold = pointSize;
@@ -420,6 +456,12 @@ int main() {
 
 
 		// Three functions that must be called each new frame.
+=======
+		// Line Editing Logic. A line can be edited in DRAW_VIEW immediately after sketching or in EDIT_VIEW after an object has been selected.
+
+
+		// Start ImGui Frame
+>>>>>>> Stashed changes
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
@@ -497,7 +539,109 @@ int main() {
 				lines.clear();
 			}
 
+<<<<<<< Updated upstream
 			ImGui::ColorEdit3("New Object Color", (float*)&lineColor);
+=======
+			if (lines.size() == 2)
+			{
+				if (ImGui::Button("Create Rotational Blending Surface"))
+				{
+					meshes.emplace_back();
+					meshInProgress = &meshes.back();
+					meshInProgress->bound1 = lines.back().verts;
+					lines.pop_back();
+					meshInProgress->bound2 = lines.back().verts;
+					lines.pop_back();
+					meshInProgress->sweep = cam.getcircle(50);
+					meshInProgress->cam = cam;
+					meshInProgress->create(75);
+					meshInProgress->updateGPU();
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshInProgress->bound1).verts.begin(); i < (meshInProgress->bound1).verts.end(); i++)
+					{
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshInProgress->bound2).verts.begin(); i < (meshInProgress->bound2).verts.end(); i++)
+					{
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshInProgress->sweep).verts.begin(); i < (meshInProgress->sweep).verts.end(); i++)
+					{
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					meshInProgress = nullptr;
+				}
+			}
+		}
+		else if (view == OBJECT_VIEW)
+		{
+			std::string frameTitle = "Object View - Object " + std::to_string(selectedObjectIndex);
+			ImGui::Begin(frameTitle.c_str());
+
+			ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
+			if (ImGui::Button("Apply Color"))
+			{
+				meshes[selectedObjectIndex].setColor(meshCol);
+			}
+
+			ImGui::Text("");
+			if (ImGui::Button("Delete"))
+			{
+				meshes.erase(meshes.begin() + selectedObjectIndex);
+				view = FREE_VIEW;
+				selectedObjectIndex = -1;
+			}
+			if (ImGui::Button("Edit Sketch"))
+			{
+				view = SKETCH_VIEW;
+			}
+			if (ImGui::Button("Edit Profile"))
+			{
+				view = PROFILE_VIEW;
+			}
+			if (ImGui::Button("Edit Cross Section"))
+			{
+				view = CROSS_VIEW;
+			}
+			if (ImGui::Button("Cancel"))
+			{
+				view = FREE_VIEW;
+				selectedObjectIndex = -1;
+			}
+>>>>>>> Stashed changes
+		}
+		else if (view == SKETCH_VIEW || view == PROFILE_VIEW || view == CROSS_VIEW) {
+			if (view == SKETCH_VIEW) {
+				std::string frameTitle = "Edit Sketch - Object " + std::to_string(selectedObjectIndex);
+				ImGui::Begin(frameTitle.c_str());
+			}
+			else if (view == PROFILE_VIEW) {
+				std::string frameTitle = "Edit Profile - Object " + std::to_string(selectedObjectIndex);
+				ImGui::Begin(frameTitle.c_str());
+			}
+			else {
+				std::string frameTitle = "Edit Cross Section - Object " + std::to_string(selectedObjectIndex);
+				ImGui::Begin(frameTitle.c_str());
+			}
+			if (ImGui::Button("Cancel"))
+			{
+				view = OBJECT_VIEW;
+			}
 		}
 
 		//if (meshes.size() > 0) {
