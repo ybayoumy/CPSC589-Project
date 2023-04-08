@@ -298,6 +298,7 @@ int main() {
 	bool simpleWireframe = false;
 	bool showbounds = false;
 	bool hide = false;
+	bool cross = false;
 	//bool sweep = false;
 
 	// Set the initial, default values of the shading uniforms.
@@ -315,6 +316,7 @@ int main() {
 	glm::vec3 lineColor{ 0.0f, 1.0f, 0.7f };
 	std::vector<Line> lines;
 	std::vector<Line> points;
+	std::vector<Line> axis;
 
 	Line* pointsInProgress = nullptr;
 	Line* lineInProgress = nullptr;
@@ -329,7 +331,9 @@ int main() {
 	int selectedPointIndex = -1; // Used for point dragging & deletion
 	glm::vec2 editing = glm::vec2(-1, -1);
 
-	int precision = 150;
+	int precision = 60;
+	bool updatebounds = false;
+	bool crossing = false;
 
 	//std::vector<Line> pinch;
 	//pinch.push_back(Line());
@@ -355,7 +359,8 @@ int main() {
 		glfwPollEvents();
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time
-		if (inDrawMode && cb->leftMouseDown) {
+		if ((inDrawMode || cross) && cb->leftMouseDown) {
+			float threshold = pointSize;
 			glm::vec4 cursorPos = cam.getCursorPos(cb->getCursorPosGL());
 
 			if (lineInProgress) {
@@ -370,8 +375,15 @@ int main() {
 					Vertex newPoint = Vertex{ lastVertex.position + slope * dist, lineColor, glm::vec3(0.0f) };
 					lineInProgress->verts.push_back(newPoint);
 				}
-
 				lineInProgress->updateGPU();
+
+				/*if (crossing) {
+					int selected = cb->indexOfPointAtCursorPos(bounds[0].verts, cb->getCursorPosGL(), threshold, cam);
+					if (selected == -1) {
+						crossing = false;
+						lineInProgress = nullptr;
+					}
+				}*/
 			}
 			else if (lines.size() < 2) {
 				// create a new line
@@ -380,8 +392,10 @@ int main() {
 				lineInProgress->updateGPU();
 			}
 		}
-		else if (!inDrawMode || !cb->leftMouseDown) {
+		else if ((!inDrawMode && !cross) || !cb->leftMouseDown) {
 			if (lineInProgress != nullptr) {
+				crossing = false;
+
 				points.emplace_back(Line(lineInProgress->verts));
 				pointsInProgress = &points.back();
 				pointsInProgress->ChaikinAlg(2, black);
@@ -407,17 +421,100 @@ int main() {
 				}
 			}
 		}
-		if (inEditMode && cb->leftMouseDown && editing.y >= 0) {
-			// Drag selected point.
-			points[editing.x].verts[editing.y].position = cam.getCursorPos(cb->getCursorPosGL());
-			points[editing.x].updateGPU();
 
-			lines[editing.x].verts = points[editing.x].BSpline(precision, lineColor);
-			lines[editing.x].updateGPU();
+		/*else if (inEditMode && cb->leftMouseJustPressed() && cross && meshes.size() > 0) {
+			float threshold = pointSize;
+			for (int i = 0; i < bounds.size(); i++) {
+				selectedPointIndex = cb->indexOfPointAtCursorPos(bounds[i].verts, cb->getCursorPosGL(), threshold, cam);
+				if (selectedPointIndex != -1) {
+					crossing = true;
+					lines.emplace_back(std::vector<Vertex>{ Vertex{ cam.getCursorPos(cb->getCursorPosGL()), lineColor, glm::vec3(0.0f) } });
+					lineInProgress = &lines.back();
+					lineInProgress->updateGPU();
+
+					std::vector<Vertex> connect;
+					connect.emplace_back(meshes[0].bound1.verts[selectedPointIndex]);
+					connect.emplace_back(meshes[0].bound2.verts[selectedPointIndex]);
+
+					bounds.clear();
+					bounds.emplace_back(Line(connect));
+					boundInProgress = &bounds.back();
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+				}
+			}
+		}*/
+
+
+
+		if (inEditMode && cb->leftMouseDown && editing.y >= 0 && (lines.size() > 0 || bounds.size() > 0)) {
+			if (bounds.size() > 0) {
+				int pointindex = meshes[editing.x].axis.match(cam.getCursorPos(cb->getCursorPosGL()), cam);
+
+				points[editing.x].verts[editing.y].position = meshes[editing.x].axis.verts[pointindex].position;
+				bounds[editing.y].verts = meshes[editing.x].discs[pointindex].verts;
+
+				points[editing.x].updateGPU();
+				bounds[editing.y].updateGPU();
+
+				meshes[editing.x].sweepindex[selectedPointIndex] = pointindex;
+
+				updatebounds = true;
+			}
+			else {
+				// Drag selected point (for 2d editing)
+				points[editing.x].verts[editing.y].position = cam.getCursorPos(cb->getCursorPosGL());
+				points[editing.x].updateGPU();
+
+				lines[editing.x].verts = points[editing.x].BSpline(precision, lineColor);
+				lines[editing.x].updateGPU();
+			}
 		}
+		else {
+			editing = glm::vec2(-1, -1);
+		}
+		
+		if (inEditMode && meshes.size() > 0 && updatebounds) {
+			bounds.clear();
+			for (auto i = meshes.begin(); i < meshes.end(); i++) {
+				
+				bounds.emplace_back(Line((*i).discs[0].verts));
+				boundInProgress = &bounds.back();
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
 
+				bounds.emplace_back(Line((*i).discs.back().verts));
+				boundInProgress = &bounds.back();
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				bounds.emplace_back(Line((*i).axis.verts));
+				boundInProgress = &bounds.back();
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				bounds.emplace_back(Line((*i).bound1.verts));
+				boundInProgress = &bounds.back();
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				bounds.emplace_back(Line((*i).bound2.verts));
+				boundInProgress = &bounds.back();
+				boundInProgress->updateGPU();
+				boundInProgress = nullptr;
+
+				std::vector<Vertex> endpoints;
+				endpoints.push_back((*i).axis.verts[0]);
+				endpoints.push_back((*i).axis.verts.back());
+				points.emplace_back(Line(endpoints));
+				pointsInProgress = &points.back();
+				pointsInProgress->updateGPU();
+				pointsInProgress = nullptr;
+
+			}
+			updatebounds = false;
+		}
 		//std::cout << editing.y << std::endl;
-
 
 		// Three functions that must be called each new frame.
 		ImGui_ImplOpenGL3_NewFrame();
@@ -426,6 +523,7 @@ int main() {
 
 		std::string imguiWindowTitle = "";
 		if (inDrawMode) imguiWindowTitle = "Draw Mode";
+		else if (inEditMode) imguiWindowTitle = "Edit Mode";
 		else imguiWindowTitle = "Free View";
 
 		ImGui::Begin(imguiWindowTitle.c_str());
@@ -473,7 +571,7 @@ int main() {
 			}
 		}
 
-		if (inDrawMode) {
+		if (inDrawMode || inEditMode) {
 			ImGui::Text("");
 			if (ImGui::Button("View XY Plane") && lines.size() == 0) {
 				cam.phi = 0.f;
@@ -500,17 +598,25 @@ int main() {
 			ImGui::ColorEdit3("New Object Color", (float*)&lineColor);
 		}
 
-		//if (meshes.size() > 0) {
-		//	ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
-		//}
+		if (inEditMode) {
+			ImGui::Checkbox("Edit Cross Section Shape", &hide);
+			ImGui::Checkbox("Add New Cross Section", &cross);
+		}
+		else {
+			hide = false;
+		}
 
-		//if (lines.size() % 2 != 0 && lines.size() != 0) {
-		//	if (ImGui::Button("Update Sweep") && meshchoice != 0) {
-		//		meshes[meshchoice - 1].sweep = meshes[meshchoice - 1].cam.standardize(lines.back().verts);
-		//		lines.pop_back();
-		//		meshes[meshchoice - 1].create(75);
-		//		meshes[meshchoice - 1].updateGPU();
-		//		
+		if (meshes.size() > 0) {
+			if (lines.size() == 1) {
+				if (ImGui::Button("Update Sweep")) {
+					meshes[0].sweep = meshes[0].cam.standardize(lines.back().verts);
+					lines.pop_back();
+					meshes[0].create(precision, meshes[0].mycolor);
+					meshes[0].updateGPU();
+				}
+			}
+		}
+
 		//		bounds.emplace_back();
 		//		boundInProgress = &bounds.back();
 		//		for (auto i = (meshes[meshchoice - 1].sweep).verts.begin(); i < (meshes[meshchoice - 1].sweep).verts.end(); i++) {
@@ -546,17 +652,18 @@ int main() {
 				meshInProgress->bound2 = lines.back().verts;
 				lines.pop_back();
 				points.pop_back();
-				meshInProgress->sweep = cam.getcircle(50);
+				meshInProgress->sweep = cam.getcircle(floor(precision/2));
 				meshInProgress->cam = cam;
 				meshInProgress->create(precision, lineColor);
 				meshInProgress->updateGPU();
 
-				bounds.emplace_back();
+				updatebounds = true;
+				/*bounds.emplace_back();
 				boundInProgress = &bounds.back();
 				boundInProgress->verts.push_back(Vertex{meshInProgress->bound1.verts.back().position, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f) });
 				boundInProgress->verts.push_back(Vertex{meshInProgress->bound2.verts.back().position, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f) });
 				boundInProgress->updateGPU();
-				boundInProgress = nullptr;
+				boundInProgress = nullptr;*/
 
 				/*bounds.emplace_back();
 				boundInProgress = &bounds.back();
@@ -579,7 +686,7 @@ int main() {
 			}
 		}
 
-		if (!inDrawMode) {
+		if (!inDrawMode && !inEditMode) {
 			ImGui::Text("");
 			ImGui::Text("Export to .obj");
 			ImGui::InputText("Filename", ObjFilename, size_t(32));
@@ -704,11 +811,12 @@ int main() {
 		}
 
 		// Drawing Lines (no Lighting)
-		/*if (inEditMode) {
+		if (inEditMode && meshes.size() > 0) {
 			for (Line& bound : bounds) {
+				bound.draw(noLightingShader);
 				bound.drawPoints(pointSize, noLightingShader);
 			}
-		}*/
+		}
 
 		glDisable(GL_FRAMEBUFFER_SRGB); // disable sRGB for things like imgui
 

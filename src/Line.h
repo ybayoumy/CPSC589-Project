@@ -9,6 +9,34 @@
 #include "Geometry.h"
 #include "ShaderProgram.h"
 
+glm::vec3 closestvec(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
+	glm::vec3 closest;
+	float min = 10.f;
+
+	for (auto i = points.begin(); i < points.end(); i++) {
+		float distance = glm::distance(ref * (*i).position, ref * point);
+		if (distance < min) {
+			closest = (*i).position;
+			min = distance;
+		}
+	}
+	return closest;
+}
+
+int closestindex(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
+	int closest = -1;
+	float min = 10.f;
+
+	for (int i = 0; i < points.size(); i++) {
+		float distance = glm::distance(ref * points[i].position, ref * point);
+		if (distance < min) {
+			min = distance;
+			closest = i;
+		}
+	}
+	return closest;
+}
+
 std::vector <float> getbasis(int k, int m) {
 	std::vector <float> basis;
 	for (int i = 1; i <= 3; i++) {
@@ -92,6 +120,13 @@ public:
 		glBindVertexArray(0);
 	}
 
+	void drawClose(ShaderProgram& shader) {
+		shader.use();
+		geometry.bind();
+		glDrawArrays(GL_LINE_LOOP, 0, GLsizei(verts.size()));
+		glBindVertexArray(0);
+	}
+
 	void drawPoints(float pointSize, ShaderProgram& shader) {
 		shader.use();
 		geometry.bind();
@@ -147,6 +182,22 @@ public:
 		}
 
 		return spline;
+	}
+
+	int match(glm::vec3 cursorPos, Camera current) {
+		return closestindex(verts, cursorPos, glm::vec3(1.f, 1.f, 1.f) - current.getUp());
+	}
+
+	void toScreen(Camera current) {
+		for (auto j = verts.begin(); j < verts.end(); j++) {
+			(*j).position = glm::vec3(current.getMousePos(glm::vec4((*j).position, 1.f)), 0.f);
+		}
+	}
+
+	void toWorld(Camera current) {
+		for (auto j = verts.begin(); j < verts.end(); j++) {
+			(*j).position = current.getCursorPos((*j).position);
+		}
 	}
 
 	void updateGPU() {

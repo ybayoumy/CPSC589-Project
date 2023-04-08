@@ -123,8 +123,12 @@ std::vector<Vertex> Camera::standardize(std::vector<Vertex> line) {
 	glm::vec3 ymin = temp.back().position;
 
 	glm::vec3 center;
+	glm::vec3 newcenter;
+
+	//newcenter = 0.5f * (xmin + xmax);
+
 	if (glm::vec3(0.f, 1.f, 0.f).y != 0) {
-		center = 0.5f * (ymin + ymax);
+		center = 0.25f * (xmin + xmax + ymin + ymax);
 	}
 
 	float yd = fabs(ymax.y - ymin.y);
@@ -133,11 +137,13 @@ std::vector<Vertex> Camera::standardize(std::vector<Vertex> line) {
 	line.clear();
 	for (int j = 0; j < temp.size(); j++) {
 		// MOVE AND SCALE
+		//glm::translate(glm::mat4(1.f), newcenter - center) * 
 		glm::vec3 newvert = glm::scale(glm::mat4(1.f), glm::vec3(2 / yd, 2 / yd, 0)) * glm::translate(glm::mat4(1.f), -center) * glm::vec4(temp[j].position, 1.f);
 		// PUSH TO SCREEN
 		newvert = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, -radius)) * glm::vec4(newvert, 1.f);
 		// ROTATE W.R.T AXIS
 		newvert = glm::rotate(glm::mat4(1.f), float(M_PI_2), up) * glm::inverse(glm::lookAt(eye, at, glm::vec3(0.f, 1.f, 0.f))) * glm::vec4(newvert, 1.f);
+		
 		line.push_back(Vertex{ newvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
 	}
 

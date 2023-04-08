@@ -52,16 +52,83 @@ std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
 	return axis;
 }
 
+void indexGeometry(std::vector<unsigned int> &indices, int sweepsize, int sprecision) {
+
+	indices.clear();
+	
+	for (int i = 1; i <= sweepsize; i++) {
+		if (i == sweepsize) {
+			indices.push_back(0 + 1);
+			indices.push_back(0);
+			indices.push_back(i);
+		}
+		else {
+			indices.push_back(i + 1);
+			indices.push_back(0);
+			indices.push_back(i);
+		}
+	}
+
+	// creating faces using vertex indices
+	for (int i = 1; i <= sweepsize; i++) {
+		for (int j = 0; j <= sprecision; j++) {
+			if (i != sweepsize) {
+				if (j != 0) {
+					indices.push_back((sweepsize) * j + i + 1);
+					indices.push_back((sweepsize) * (j - 1) + i + 1);
+					indices.push_back((sweepsize) * j + i - 1 + 1);
+				}
+				if (j != sprecision) {
+					indices.push_back((sweepsize) * j + i + 1);
+					indices.push_back((sweepsize) * j + i - 1 + 1);
+					indices.push_back((sweepsize) * (j + 1) + i - 1 + 1);
+				}
+			}
+			else {
+				if (j != 0) {
+					indices.push_back((sweepsize) * (j)+0 + 1);
+					indices.push_back((sweepsize) * (j - 1) + 0 + 1);
+					indices.push_back((sweepsize) * (j)+sweepsize - 1 + 1);
+				}
+				if (j != sprecision) {
+					indices.push_back((sweepsize) * j + 0 + 1);
+					indices.push_back((sweepsize) * j + sweepsize - 1 + 1);
+					indices.push_back((sweepsize) * (j + 1) + sweepsize - 1 + 1);
+				}
+			}
+		}
+	}
+
+	for (int i = 1; i <= sweepsize; i++) {
+		indices.push_back(sweepsize * (sprecision + 1) - (i - 1));
+		indices.push_back(sweepsize * (sprecision + 1) + 1);
+		indices.push_back(sweepsize * (sprecision + 1) - (i - 2));
+		if (i == sweepsize) {
+			indices.push_back(sweepsize * (sprecision + 1) - 0);
+			indices.push_back(sweepsize * (sprecision + 1) + 1);
+			indices.push_back(sweepsize * (sprecision + 1) - (i - 1));
+		}
+	}
+}
+
 class Mesh
 {
 public:
+
 	std::vector<Vertex> verts;
 	std::vector<unsigned int> indices;
+	std::vector<Line> discs;
 
 	Line bound1;
 	Line bound2;
 
 	Line sweep;
+
+	std::vector<int> sweepindex;
+
+	Line axis;
+
+	glm::vec3 mycolor;
 
 	//Line pinch1;
 	//Line pinch2;
@@ -77,7 +144,9 @@ public:
 		verts.clear();
 		indices.clear();
 
-		std::vector<Vertex> axis;
+		mycolor = color;
+	
+		std::vector<Vertex> asweep;
 		std::vector<Vertex> Spline1 = bound1.verts;
 		std::vector<Vertex> Spline2 = bound2.verts;
 
@@ -132,9 +201,13 @@ public:
 		//	}
 		//}
 		//else {
+
 		for (int i = 0; i <= sprecision; i++) {
 
+			asweep.clear();
+
 			cvert = 0.5f * (Spline1[i].position + Spline2[i].position);
+			axis.verts.emplace_back(Vertex{cvert, glm::vec3(1.f) - color, glm::vec3(0.f)});
 
 			if (i == 0) {
 				glm::vec3 cvertnext = 0.5f * Spline1[i+1].position + 0.5f * Spline2[i+1].position;
@@ -153,7 +226,10 @@ public:
 				glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
 				glm::vec3 normal = glm::normalize(point - cvert);
 				verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+				asweep.emplace_back(Vertex{ glm::vec4(point, 1.f), glm::vec3(1.f) - color, normal });
 			}
+
+			discs.emplace_back(Line(asweep));
 
 			if (i == sprecision) {
 				glm::vec3 cvertprev = 0.5f * Spline1[i - 1].position + 0.5f * Spline2[i - 1].position;
@@ -161,63 +237,11 @@ public:
 			}
 		
 		}
-		//}
-		
-		for (int i = 1; i <= sweep.verts.size(); i++) {
-			if (i == sweep.verts.size()) {
-				indices.push_back(0 + 1);
-				indices.push_back(0);
-				indices.push_back(i);
-			}
-			else {
-				indices.push_back(i + 1);
-				indices.push_back(0);
-				indices.push_back(i);
-			}	
-		}
 
-		// creating faces using vertex indices
-		for (int i = 1; i <= sweep.verts.size(); i++) {
-			for (int j = 0; j <= sprecision; j++) {
-				if (i != sweep.verts.size()) {
-					if (j != 0) {
-						indices.push_back((sweep.verts.size()) * j + i + 1);
-						indices.push_back((sweep.verts.size()) * (j - 1) + i + 1);
-						indices.push_back((sweep.verts.size()) * j + i - 1 + 1);
-					}
-					if (j != sprecision) {
-						indices.push_back((sweep.verts.size()) * j + i + 1);
-						indices.push_back((sweep.verts.size()) * j + i - 1 + 1);
-						indices.push_back((sweep.verts.size()) * (j + 1) + i - 1 + 1);
-					}
-				}
-				else {
-					if (j != 0) {
-						indices.push_back((sweep.verts.size()) * (j) + 0 + 1);
-						indices.push_back((sweep.verts.size()) * (j - 1) + 0 + 1);
-						indices.push_back((sweep.verts.size()) * (j) + sweep.verts.size() - 1 + 1);
-					}
-					if (j != sprecision) {
-						indices.push_back((sweep.verts.size()) * j + 0 + 1);
-						indices.push_back((sweep.verts.size()) * j + sweep.verts.size() - 1 + 1);
-						indices.push_back((sweep.verts.size()) * (j + 1) + sweep.verts.size() - 1 + 1);
-					}
-				}
-			}
-		}
-
-		for (int i = 1; i <= sweep.verts.size(); i++) {
-			indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 1));
-			indices.push_back(sweep.verts.size() * (sprecision + 1) + 1);
-			indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 2));
-			if (i == sweep.verts.size()) {
-				indices.push_back(sweep.verts.size() * (sprecision + 1) - 0);
-				indices.push_back(sweep.verts.size() * (sprecision + 1) + 1);
-				indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 1));
-			}
-		}
-
+		indexGeometry(indices, sweep.verts.size(), sprecision);
 	}
+
+	//std::vector<Vertex> getdisc(glm::vec3 position1, glm::vec3 position2, )
 
 	void draw(ShaderProgram& shader) {
 		shader.use();
@@ -236,6 +260,7 @@ public:
 		for (auto i = verts.begin(); i < verts.end(); i++) {
 			(*i).color = col;
 		}
+		mycolor = col;
 	}
 
 	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)
@@ -243,7 +268,10 @@ public:
 		, indices(i)
 		, bound1()
 		, bound2()
+		, axis()
 		, sweep()
+		, sweepindex({0,0,0,0})
+		, mycolor (0,0,0)
 		//, pinch1()
 		//, pinch2()
 		, cam(c)
@@ -254,7 +282,10 @@ public:
 		, indices()
 		, bound1()
 		, bound2()
+		, axis()
 		, sweep()
+		, sweepindex({ 0,0,0,0 })
+		, mycolor(0, 0, 0)
 		//, pinch1()
 		//, pinch2()
 		, cam(0, 0, 1)
