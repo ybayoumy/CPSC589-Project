@@ -163,12 +163,12 @@ public:
 	}
 
 	void updateShadingUniforms(
-		const glm::vec3& lightPos, const glm::vec3& lightCol, float ambientStrength
+		const glm::vec3& lightPos, float diffuseConstant, float ambientStrength
 	)
 	{
 		// Like viewPipeline(), this function assumes shader.use() was called before.
 		glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(lightColLoc, lightCol.r, lightCol.g, lightCol.b);
+		glUniform1f(diffuseConstantLoc, diffuseConstant);
 		glUniform1f(ambientStrengthLoc, ambientStrength);
 	}
 
@@ -199,8 +199,8 @@ private:
 	// However, we may need to update them if the shader is changed and recompiled.
 	void updateUniformLocations() {
 		lightPosLoc = glGetUniformLocation(lightingShader, "lightPos");
-		lightColLoc = glGetUniformLocation(lightingShader, "lightCol");
 		ambientStrengthLoc = glGetUniformLocation(lightingShader, "ambientStrength");
+		diffuseConstantLoc = glGetUniformLocation(lightingShader, "diffuseConstant");
 
 		lightingMLoc = glGetUniformLocation(lightingShader, "M");
 		lightingVLoc = glGetUniformLocation(lightingShader, "V");
@@ -225,8 +225,8 @@ private:
 
 	// Uniform locations
 	GLint lightPosLoc;
-	GLint lightColLoc;
 	GLint ambientStrengthLoc;
+	GLint diffuseConstantLoc;
 
 	GLint lightingMLoc;
 	GLint lightingVLoc;
@@ -413,10 +413,9 @@ int main() {
 	}
 
 	glm::vec3 lightPos(0.f, 35.f, 35.f);
-	glm::vec3 lightCol(1.f);
-	float ambientStrength = 0.035f;
+	float ambientStrength = 0.1f;
+	float diffuseConstant = 0.7f;
 
-	bool inDrawMode = true;
 	bool showAxes = true;
 	bool simpleWireframe = false;
 	bool showbounds = false;
@@ -424,7 +423,7 @@ int main() {
 
 	// Set the initial, default values of the shading uniforms.
 	lightingShader.use();
-	cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
+	cb->updateShadingUniforms(lightPos, diffuseConstant, ambientStrength);
 
 	std::vector<Line> axisLines = generateAxisLines();
 	for (Line& line : axisLines) {
@@ -461,16 +460,21 @@ int main() {
 	std::string lastExportedFilename = "";
 
 	int hoveredObjectIndex = -1;
+	int selectedObjectIndex = -1;
+
+	enum ViewType { FREE_VIEW, DRAW_VIEW, OBJECT_VIEW };
+	ViewType view = FREE_VIEW;
 
 	// RENDER LOOP
 	while (!window.shouldClose()) {
 		glfwPollEvents();
 
-		if (!inDrawMode) hoveredObjectIndex = findSelectedObjectIndex(pickerFB, pickerTex, pickerShader, cb, window, meshes);
+		// Detect Hovered Objects in FREE_VIEW
+		if (view == FREE_VIEW) hoveredObjectIndex = findSelectedObjectIndex(pickerFB, pickerTex, pickerShader, cb, window, meshes);
 		else hoveredObjectIndex = -1;
 
-		// Line Drawing Logic. Max 2 lines can be drawn at a time
-		if (inDrawMode && cb->leftMouseDown) {
+		// Line Drawing Logic. Max 2 lines can be drawn at a time. Only in DRAW_VIEW
+		if (view == DRAW_VIEW && cb->leftMouseDown) {
 			float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
 			glm::vec4 cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
 			cursorPos = glm::inverse(cam.getView()) * cursorPos;
@@ -497,46 +501,49 @@ int main() {
 				lineInProgress->updateGPU();
 			}
 		}
-		else if (!inDrawMode || !cb->leftMouseDown)
+		else
 			lineInProgress = nullptr;
 
-		// Three functions that must be called each new frame.
+		// Start ImGui Frame
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
-
-		std::string imguiWindowTitle = "";
-		if (inDrawMode) imguiWindowTitle = "Draw Mode";
-		else imguiWindowTitle = "Free View";
-
-		ImGui::Begin(imguiWindowTitle.c_str());
-
 		bool change = false; // Whether any ImGui variable's changed.
 
-		//change |= ImGui::ColorEdit3("Diffuse colour", glm::value_ptr(diffuseCol));
-
-		// The rest of our ImGui widgets.
-		//change |= ImGui::DragFloat3("Light's position", glm::value_ptr(lightPos));
-		//change |= ImGui::ColorEdit3("Light's colour", glm::value_ptr(lightCol));
-		//change |= ImGui::SliderFloat("Ambient strength", &ambientStrength, 0.0f, 1.f);
-		// change |= ImGui::Checkbox("Show Wireframe", &simpleWireframe);
-		// change |= ImGui::Checkbox("Show Bounds (for Debug)", &showbounds);
-
-		if (!inDrawMode) {
+		if (view == FREE_VIEW) {
+			ImGui::Begin("Free View");
 			if (ImGui::Button("Draw Mode")) {
-				inDrawMode = true;
+				view = DRAW_VIEW;
 				change = true;
 			}
+
+			ImGui::Text("");
+			ImGui::Text("Export to .obj");
+			ImGui::InputText("Filename", ObjFilename, size_t(32));
+			if (sizeof(ObjFilename) > 0 && ImGui::Button("Save")) {
+				std::string filename = ObjFilename;
+				if (filename.find(".obj") == std::string::npos) filename += ".obj";
+
+				bool isSuccessful = exportToObj(filename, meshes);
+				if (isSuccessful) {
+					ImGui::OpenPopup("ExportObjSuccessPopup");
+					lastExportedFilename = RUNTIME_OUTPUT_DIRECTORY + std::string("/") + filename;
+					memset(ObjFilename, 0, sizeof ObjFilename);
+				}
+				else {
+					ImGui::OpenPopup("ExportObjErrorPopup");
+					lastExportedFilename = "";
+				}
+			}
 		}
-		else {
+		else if (view == DRAW_VIEW) {
+			ImGui::Begin("Draw Mode");
 			if (ImGui::Button("Free View")) {
-				inDrawMode = false;
+				view = FREE_VIEW;
 				change = true;
 				lines.clear();
 			}
-		}
 
-		if (inDrawMode) {
 			ImGui::Text("");
 			if (ImGui::Button("View XY Plane") && lines.size() == 0) {
 				cam.phi = 0.f;
@@ -553,12 +560,70 @@ int main() {
 			ImGui::Text("");
 			std::string linesDrawn = "Lines Drawn: " + std::to_string(lines.size()) + "/" + std::to_string(2);
 
-			if(lines.size() == 2) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
+			if (lines.size() == 2) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 			ImGui::Text(linesDrawn.c_str());
 			if (lines.size() == 2) ImGui::PopStyleColor();
 			if (ImGui::Button("Clear Lines")) {
 				lines.clear();
 			}
+
+			if (lines.size() == 2) {
+				if (ImGui::Button("Create Rotational Blending Surface")) {
+					meshes.emplace_back();
+					meshInProgress = &meshes.back();
+					meshInProgress->bound1 = lines.back().verts;
+					lines.pop_back();
+					meshInProgress->bound2 = lines.back().verts;
+					lines.pop_back();
+					meshInProgress->sweep = cam.getcircle(50);
+					meshInProgress->cam = cam;
+					meshInProgress->create(75);
+					meshInProgress->updateGPU();
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshInProgress->bound1).verts.begin(); i < (meshInProgress->bound1).verts.end(); i++) {
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshInProgress->bound2).verts.begin(); i < (meshInProgress->bound2).verts.end(); i++) {
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshInProgress->sweep).verts.begin(); i < (meshInProgress->sweep).verts.end(); i++) {
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					meshInProgress = nullptr;
+				}
+			}
+		}
+		else if (view == OBJECT_VIEW) {
+				ImGui::Begin("Object View - Object");
+		}
+
+		if (ImGui::BeginPopupModal("ExportObjSuccessPopup")) {
+			ImGui::Text("Successfully exported .obj file. File can be found here:");
+			ImGui::Text(lastExportedFilename.c_str());
+			ImGui::Text("");
+			if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+		else if (ImGui::BeginPopupModal("ExportObjErrorPopup")) {
+			ImGui::Text("There was an error exporting the .obj file.");
+			ImGui::Text("");
+			if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
 		}
 
 		//if (meshes.size() > 0) {
@@ -597,89 +662,6 @@ int main() {
 		//	}
 		//}
 
-		if (lines.size() == 2) {
-			if (ImGui::Button("Create Rotational Blending Surface")) {
-				meshes.emplace_back();
-				meshInProgress = &meshes.back();
-				meshInProgress->bound1 = lines.back().verts;
-				lines.pop_back();
-				meshInProgress->bound2 = lines.back().verts;
-				lines.pop_back();
-				meshInProgress->sweep = cam.getcircle(50);
-				meshInProgress->cam = cam;
-				meshInProgress->create(75);
-				meshInProgress->updateGPU();
-
-				bounds.emplace_back();
-				boundInProgress = &bounds.back();
-				for (auto i = (meshInProgress->bound1).verts.begin(); i < (meshInProgress->bound1).verts.end(); i++) {
-					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
-				}
-				boundInProgress->updateGPU();
-				boundInProgress = nullptr;
-
-				bounds.emplace_back();
-				boundInProgress = &bounds.back();
-				for (auto i = (meshInProgress->bound2).verts.begin(); i < (meshInProgress->bound2).verts.end(); i++) {
-					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
-				}
-				boundInProgress->updateGPU();
-				boundInProgress = nullptr;
-
-				bounds.emplace_back();
-				boundInProgress = &bounds.back();
-				for (auto i = (meshInProgress->sweep).verts.begin(); i < (meshInProgress->sweep).verts.end(); i++) {
-					boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
-				}
-				boundInProgress->updateGPU();
-				boundInProgress = nullptr;
-
-				meshInProgress = nullptr;
-			}
-		}
-
-		if (!inDrawMode) {
-			ImGui::Text("");
-			ImGui::Text("Export to .obj");
-			ImGui::InputText("Filename", ObjFilename, size_t(32));
-			if (sizeof(ObjFilename) > 0 && ImGui::Button("Save")) {
-				std::string filename = ObjFilename;
-				if (filename.find(".obj") == std::string::npos) filename += ".obj";
-
-				bool isSuccessful = exportToObj(filename, meshes);
-				if (isSuccessful) {
-					ImGui::OpenPopup("ExportObjSuccessPopup");
-					lastExportedFilename = RUNTIME_OUTPUT_DIRECTORY + std::string("/") + filename;
-					memset(ObjFilename, 0, sizeof ObjFilename);
-				}
-				else {
-					ImGui::OpenPopup("ExportObjErrorPopup");
-					lastExportedFilename = "";
-				}
-			}
-		}
-
-		if (ImGui::BeginPopupModal("ExportObjSuccessPopup")) {
-			ImGui::Text("Successfully exported .obj file. File can be found here:");
-			ImGui::Text(lastExportedFilename.c_str());
-			ImGui::Text("");
-			if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
-		}
-		else if (ImGui::BeginPopupModal("ExportObjErrorPopup")) {
-			ImGui::Text("There was an error exporting the .obj file.");
-			ImGui::Text("");
-			if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
-		}
-
-		// Framerate display, in case you need to debug performance.
-		ImGui::Text("");
-		change |= ImGui::Checkbox("Show Axes", &showAxes);
-		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-		ImGui::End();
-		ImGui::Render();
-
 		//if (sweep) {
 		//	bounds.emplace_back();
 		//	boundInProgress = &bounds.back();
@@ -706,13 +688,20 @@ int main() {
 		//	sweep = false;
 		//}
 
+		// Framerate display, in case you need to debug performance.
+		ImGui::Text("");
+		change |= ImGui::Checkbox("Show Axes", &showAxes);
+		ImGui::Text("Average %.1f ms/frame (%.1f fps)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+		ImGui::End();
+		ImGui::Render();
+
 		if (change) {
-			if (inDrawMode) {
+			if (view == DRAW_VIEW) {
 				cam.phi = 0.f;
 				cam.theta = 0.f;
 				cam.fix();
 			}
-			else {
+			else if (view == FREE_VIEW) {
 				cam.unFix();
 			}
 		}
@@ -736,13 +725,20 @@ int main() {
 
 		// Drawing Meshes (with Lighting)
 		lightingShader.use();
-		if (change)
-		{
-			cb->updateShadingUniforms(lightPos, lightCol, ambientStrength);
-		}
 		cb->lightingViewPipeline();
-		for (Mesh& mesh : meshes) {
-			mesh.draw();
+		for (int i = 0; i < meshes.size(); i++) {
+			float a = ambientStrength;
+			float d = diffuseConstant;
+			if (hoveredObjectIndex >= 0 && i == hoveredObjectIndex) {
+				d += 0.2f;
+				a += 0.05f;
+			}
+			else if (hoveredObjectIndex >= 0 && i != hoveredObjectIndex) {
+				d -= 0.2;
+				a -= 0.05f;
+			}
+			cb->updateShadingUniforms(lightPos, d, a);
+			meshes[i].draw();
 		}
 		
 		// Drawing Lines (no Lighting)

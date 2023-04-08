@@ -5,22 +5,16 @@ in vec3 fragCol;
 in vec3 n;
 
 uniform vec3 lightPos;
-uniform vec3 lightCol;
-
 uniform float ambientStrength;
-
-uniform int texExistence;
-
-uniform sampler2D tex;
+uniform float diffuseConstant;
 
 out vec4 color;
 
 void main() {
 	vec3 norm = normalize(n);
 	vec3 lightDir = normalize(lightPos - fragPos);
-	float diffuseStrength = max(0.0, dot(norm, lightDir));
 
-	vec3 diffuseCol = diffuseStrength * fragCol;
+	float diffuseStrength = diffuseConstant * max(0.0, dot(norm, lightDir));
 
-	color = vec4(lightCol * (vec3(ambientStrength) + diffuseCol), 1.0);
+	color = vec4((diffuseStrength + ambientStrength) * fragCol, 1.0);
 }
