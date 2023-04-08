@@ -454,8 +454,6 @@ int main() {
 	//std::vector<glm::vec3> direction;
 	//bool XZ = false;
 
-	//int meshchoice = 0;
-
 	char ObjFilename[] = "";
 	std::string lastExportedFilename = "";
 
@@ -472,6 +470,12 @@ int main() {
 		// Detect Hovered Objects in FREE_VIEW
 		if (view == FREE_VIEW) hoveredObjectIndex = findSelectedObjectIndex(pickerFB, pickerTex, pickerShader, cb, window, meshes);
 		else hoveredObjectIndex = -1;
+
+		// switch for OBJECT_VIEW when a hovered object gets clicked
+		if (hoveredObjectIndex >= 0 && cb->leftMouseDown) {
+			selectedObjectIndex = hoveredObjectIndex;
+			view = OBJECT_VIEW;
+		}
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time. Only in DRAW_VIEW
 		if (view == DRAW_VIEW && cb->leftMouseDown) {
@@ -609,7 +613,21 @@ int main() {
 			}
 		}
 		else if (view == OBJECT_VIEW) {
-				ImGui::Begin("Object View - Object");
+			std::string frameTitle = "Object View - Object " + std::to_string(selectedObjectIndex);
+			ImGui::Begin(frameTitle.c_str());
+
+
+
+			ImGui::Text("");
+			if (ImGui::Button("Delete")) {
+				meshes.erase(meshes.begin() + selectedObjectIndex);
+				view = FREE_VIEW;
+				selectedObjectIndex = -1;
+			}
+			if (ImGui::Button("Cancel")) {
+				view = FREE_VIEW;
+				selectedObjectIndex = -1;
+			}
 		}
 
 		if (ImGui::BeginPopupModal("ExportObjSuccessPopup")) {
@@ -729,11 +747,11 @@ int main() {
 		for (int i = 0; i < meshes.size(); i++) {
 			float a = ambientStrength;
 			float d = diffuseConstant;
-			if (hoveredObjectIndex >= 0 && i == hoveredObjectIndex) {
+			if ((selectedObjectIndex >= 0 && i == selectedObjectIndex) || (hoveredObjectIndex >= 0 && i == hoveredObjectIndex)) {
 				d += 0.2f;
 				a += 0.05f;
 			}
-			else if (hoveredObjectIndex >= 0 && i != hoveredObjectIndex) {
+			else if ((selectedObjectIndex >= 0 && i != selectedObjectIndex) || hoveredObjectIndex >= 0 && i != hoveredObjectIndex) {
 				d -= 0.2;
 				a -= 0.05f;
 			}
