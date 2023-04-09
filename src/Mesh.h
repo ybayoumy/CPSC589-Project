@@ -39,8 +39,8 @@ void orderlines(std::vector<Vertex>& Line1, std::vector<Vertex>& Line2) {
 
 std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
 	std::vector<Vertex> axis;
-	std::vector<Vertex> Spline1 = l1.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
-	std::vector<Vertex> Spline2 = l2.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
+	std::vector<Vertex> Spline1 = l1.BSpline(sprecision);
+	std::vector<Vertex> Spline2 = l2.BSpline(sprecision);
 
 	orderlines(Spline1, Spline2);
 
@@ -58,6 +58,8 @@ public:
 	std::vector<Vertex> verts;
 	std::vector<unsigned int> indices;
 
+	glm::vec3 color;
+
 	Line bound1;
 	Line bound2;
 
@@ -73,13 +75,13 @@ public:
 
 	GPU_Geometry geometry;
 
-	void create(int sprecision, glm::vec3 color) {
+	void create(int sprecision) {
 		verts.clear();
 		indices.clear();
 
 		std::vector<Vertex> axis;
-		std::vector<Vertex> Spline1 = bound1.verts;
-		std::vector<Vertex> Spline2 = bound2.verts;
+		std::vector<Vertex> Spline1 = bound1.BSpline(sprecision);
+		std::vector<Vertex> Spline2 = bound2.BSpline(sprecision);
 
 		glm::vec3 cvert = glm::vec3(0.f);
 		glm::vec3 diameter = glm::vec3(0.f);
@@ -219,8 +221,7 @@ public:
 
 	}
 
-	void draw(ShaderProgram& shader) {
-		shader.use();
+	void draw() {
 		geometry.bind();
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
@@ -233,14 +234,19 @@ public:
 	}
 
 	void setColor(glm::vec3 col) {
-		for (auto i = verts.begin(); i < verts.end(); i++) {
-			(*i).color = col;
+		color = col;
+
+		for (Vertex& v : verts) {
+			v.color = color;
 		}
+
+		updateGPU();
 	}
 
 	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)
 		: verts(v)
 		, indices(i)
+		, color(glm::vec3(1.f, 0.f, 0.f))
 		, bound1()
 		, bound2()
 		, sweep()
@@ -252,6 +258,7 @@ public:
 	Mesh()
 		: verts()
 		, indices()
+		, color(glm::vec3(1.f, 0.f, 0.f))
 		, bound1()
 		, bound2()
 		, sweep()

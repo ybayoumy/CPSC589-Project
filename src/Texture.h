@@ -13,6 +13,9 @@ class Texture {
 public:
 	Texture(std::string path, GLint interpolation);
 
+	// Constructor for blank texture.
+	Texture(int level, GLint internalFormat, GLsizei width, GLsizei height, GLenum format, GLenum type, GLint interpolation);
+
 	// Because we're using the TextureHandle to do RAII for the texture for us
 	// and our other types are trivial or provide their own RAII
 	// we don't have to provide any specialized functions here. Rule of zero
@@ -29,7 +32,11 @@ public:
 	glm::ivec2 getDimensions() const { return glm::uvec2(width, height); }
 
 	void bind() { glBindTexture(GL_TEXTURE_2D, textureID); }
-	void unbind() { glBindTexture(GL_TEXTURE_2D, textureID); }
+	void unbind() { glBindTexture(GL_TEXTURE_2D, 0); }
+
+	operator GLuint() const {
+		return textureID;
+	}
 
 private:
 	TextureHandle textureID;

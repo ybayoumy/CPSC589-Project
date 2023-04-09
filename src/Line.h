@@ -85,15 +85,13 @@ public:
 	GPU_Geometry geometry;
 	bool standardized;
 
-	void draw(ShaderProgram& shader) {
-		shader.use();
+	void draw() {
 		geometry.bind();
 		glDrawArrays(GL_LINE_STRIP, 0, GLsizei(verts.size()));
 		glBindVertexArray(0);
 	}
 
-	void drawPoints(float pointSize, ShaderProgram& shader) {
-		shader.use();
+	void drawPoints(float pointSize) {
 		geometry.bind();
 		glPointSize(pointSize);
 		glDrawArrays(GL_POINTS, 0, GLsizei(verts.size()));
@@ -134,7 +132,7 @@ public:
 		}
 	}
 
-	std::vector<Vertex> BSpline(int precision, glm::vec3 color) {
+	std::vector<Vertex> BSpline(int precision) {
 		std::vector <Vertex> spline;
 		
 		float u;
@@ -143,7 +141,7 @@ public:
 
 		for (int i = 0; i <= precision; i++) {
 			u = double(i) / precision;
-			spline.push_back(Vertex{ getvert(verts, basis, u, 3, verts.size() - 1), color, glm::vec3(0.f, 0.f, 0.f) });
+			spline.push_back(Vertex{ getvert(verts, basis, u, 3, verts.size() - 1), glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
 		}
 
 		return spline;
