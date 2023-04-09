@@ -446,7 +446,10 @@ int main()
 	{
 		FREE_VIEW,
 		DRAW_VIEW,
-		OBJECT_VIEW
+		OBJECT_VIEW,
+		CURVE_VIEW,
+		PROFILE_VIEW,
+		CROSS_VIEW
 	};
 	ViewType view = FREE_VIEW;
 
@@ -635,28 +638,45 @@ int main()
 		}
 		else if (view == OBJECT_VIEW)
 		{
-			std::string frameTitle = "Object View - Object " + std::to_string(selectedObjectIndex);
-			ImGui::Begin(frameTitle.c_str());
+		std::string frameTitle = "Object View - Object " + std::to_string(selectedObjectIndex);
+		ImGui::Begin(frameTitle.c_str());
 
-			ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
-			if (ImGui::Button("Apply Color"))
-			{
-				meshes[selectedObjectIndex].setColor(meshCol);
-			}
+		ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
+		if (ImGui::Button("Apply Color"))
+		{
+			meshes[selectedObjectIndex].setColor(meshCol);
+		}
 
-			ImGui::Text("");
-			if (ImGui::Button("Delete"))
-			{
-				meshes.erase(meshes.begin() + selectedObjectIndex);
-				view = FREE_VIEW;
-				selectedObjectIndex = -1;
-			}
+		if (ImGui::Button("Modify Object Curves")) {
+			view = CURVE_VIEW;
+		}
+		if (ImGui::Button("Modify Object Profile")) {
+			view = PROFILE_VIEW;
+		}
+		if (ImGui::Button("Modify Object Cross-Section")) {
+			view = CROSS_VIEW;
+		}
+
+		ImGui::Text("");
+		if (ImGui::Button("Delete"))
+		{
+			meshes.erase(meshes.begin() + selectedObjectIndex);
+			view = FREE_VIEW;
+			selectedObjectIndex = -1;
+		}
+		if (ImGui::Button("Cancel"))
+		{
+			view = FREE_VIEW;
+			selectedObjectIndex = -1;
+		}
+		}
+		else if (view == CURVE_VIEW || view == PROFILE_VIEW || view == CROSS_VIEW) {
 			if (ImGui::Button("Cancel"))
 			{
-				view = FREE_VIEW;
-				selectedObjectIndex = -1;
+				view = OBJECT_VIEW
 			}
 		}
+
 
 		if (ImGui::BeginPopupModal("ExportObjSuccessPopup"))
 		{
