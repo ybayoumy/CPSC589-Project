@@ -9,6 +9,34 @@
 #include "Geometry.h"
 #include "ShaderProgram.h"
 
+glm::vec3 closestvec(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
+	glm::vec3 closest;
+	float min = 10.f;
+
+	for (auto i = points.begin(); i < points.end(); i++) {
+		float distance = glm::distance(ref * (*i).position, ref * point);
+		if (distance < min) {
+			closest = (*i).position;
+			min = distance;
+		}
+	}
+	return closest;
+}
+
+int closestindex(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
+	int closest = -1;
+	float min = 10.f;
+
+	for (int i = 0; i < points.size(); i++) {
+		float distance = glm::distance(ref * points[i].position, ref * point);
+		if (distance < min) {
+			min = distance;
+			closest = i;
+		}
+	}
+	return closest;
+}
+
 std::vector <float> getbasis(int k, int m) {
 	std::vector <float> basis;
 	for (int i = 1; i <= 3; i++) {
@@ -84,6 +112,7 @@ public:
 	std::vector<Vertex> verts;
 	GPU_Geometry geometry;
 	bool standardized;
+	glm::vec3 col;
 
 	void draw() {
 		geometry.bind();
@@ -98,7 +127,7 @@ public:
 		glBindVertexArray(0);
 	}
 
-	void ChaikinAlg(int iter, glm::vec3 color) {
+	void ChaikinAlg(int iter) {
 		glm::vec3 newpoint;
 		std::vector<Vertex> Chaikin;
 		for (int n = 0; n < iter; n++) {
@@ -108,43 +137,50 @@ public:
 
 			// C[0] = F[0]
 			newpoint = verts[0].position;
-			Chaikin.push_back(Vertex{newpoint, color, glm::vec3(0.f)});
+			Chaikin.push_back(Vertex{newpoint, col, glm::vec3(0.f)});
 			
 			// C[1] = - 1/2F[0] + F[1] + 3/4F[2] - 1/4F[3]
 			newpoint = -0.5f * verts[0].position + verts[1].position + 0.75f * verts[2].position - 0.25f * verts[3].position;
-			Chaikin.push_back(Vertex{newpoint, color, glm::vec3(0.f) });
+			Chaikin.push_back(Vertex{newpoint, col, glm::vec3(0.f) });
 
 			for (int i = 2; i <= m-5; i += 2) {
 				// C[j] = - 1/4F[i] + 3/4F[i+1] + 3/4F[i+2] - 1/4F[i+3]
 				newpoint = -0.25f * verts[i].position + 0.75f * verts[i+1].position + 0.75f * verts[i+2].position - 0.25f * verts[i+3].position;
-				Chaikin.push_back(Vertex{newpoint, color, glm::vec3(0.f)});
+				Chaikin.push_back(Vertex{newpoint, col, glm::vec3(0.f)});
 			}
 
 			// C[j] = - 1/4F[m-3] + 3/4F[m-2] + F[m-1] - 1/2F[m]
 			newpoint = -0.25f * verts[m - 3].position + 0.75f * verts[m - 2].position + verts[m - 1].position - 0.5f * verts[m].position;
-			Chaikin.push_back(Vertex{ newpoint, color, glm::vec3(0.f) });
+			Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
 
 			// C[j+1] = F[m]
 			newpoint = verts[m].position;
-			Chaikin.push_back(Vertex{ newpoint, color, glm::vec3(0.f) });
+			Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
 
 			verts = Chaikin;
 		}
 	}
 
-	std::vector<Vertex> BSpline(int precision) {
+	void setColor(glm::vec3 mycolor) {
+		for (auto i = verts.begin(); i < verts.end(); i++) {
+			(*i).color = mycolor;
+		}
+		col = mycolor;
+	}
+
+	void BSpline(int precision, glm::vec3 color) {
+		col = color;
 		std::vector <Vertex> spline;
 		
 		float u;
 		std::vector<float> basis = getbasis(3, verts.size() - 1);
 
-
 		for (int i = 0; i <= precision; i++) {
 			u = double(i) / precision;
-			spline.push_back(Vertex{ getvert(verts, basis, u, 3, verts.size() - 1), glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
+			spline.push_back(Vertex{ getvert(verts, basis, u, 3, verts.size() - 1), col, glm::vec3(0.f, 0.f, 0.f) });
 		}
 
-		return spline;
+		verts = spline;
 	}
 
 	void updateGPU() {
@@ -155,10 +191,12 @@ public:
 	Line(std::vector<Vertex> v)
 		: verts(v)
 		, standardized(false)
+		, col(0,0,0)
 	{}
 
 	Line()
 		: verts()
 		, standardized(false)
+		, col(0,0,0)
 	{}
 };

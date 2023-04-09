@@ -38,9 +38,12 @@ void orderlines(std::vector<Vertex>& Line1, std::vector<Vertex>& Line2) {
 }
 
 std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
+	l1.BSpline(sprecision, glm::vec3(0.f));
+	l2.BSpline(sprecision, glm::vec3(0.f));
+
 	std::vector<Vertex> axis;
-	std::vector<Vertex> Spline1 = l1.BSpline(sprecision);
-	std::vector<Vertex> Spline2 = l2.BSpline(sprecision);
+	std::vector<Vertex> Spline1 = l1.verts;
+	std::vector<Vertex> Spline2 = l2.verts;
 
 	orderlines(Spline1, Spline2);
 
@@ -62,8 +65,10 @@ public:
 
 	Line bound1;
 	Line bound2;
-
 	Line sweep;
+
+	Line ctrlpts1;
+	Line ctrlpts2;
 
 	//Line pinch1;
 	//Line pinch2;
@@ -80,8 +85,15 @@ public:
 		indices.clear();
 
 		std::vector<Vertex> axis;
-		std::vector<Vertex> Spline1 = bound1.BSpline(sprecision);
-		std::vector<Vertex> Spline2 = bound2.BSpline(sprecision);
+
+		bound1 = Line(ctrlpts1.verts);
+		bound2 = Line(ctrlpts2.verts);
+
+		bound1.BSpline(sprecision, glm::vec3(0.f));
+		bound2.BSpline(sprecision, glm::vec3(0.f));
+
+		std::vector<Vertex> Spline1 = bound1.verts;
+		std::vector<Vertex> Spline2 = bound2.verts;
 
 		glm::vec3 cvert = glm::vec3(0.f);
 		glm::vec3 diameter = glm::vec3(0.f);
@@ -246,7 +258,9 @@ public:
 	Mesh(std::vector<Vertex>& v, std::vector<unsigned int>& i, Camera& c)
 		: verts(v)
 		, indices(i)
-		, color(glm::vec3(1.f, 0.f, 0.f))
+		, color(glm::vec3(0.f, 0.f, 0.f))
+		, ctrlpts1()
+		, ctrlpts2()
 		, bound1()
 		, bound2()
 		, sweep()
@@ -258,7 +272,9 @@ public:
 	Mesh()
 		: verts()
 		, indices()
-		, color(glm::vec3(1.f, 0.f, 0.f))
+		, color(glm::vec3(0.f, 0.f, 0.f))
+		, ctrlpts1()
+		, ctrlpts2()
 		, bound1()
 		, bound2()
 		, sweep()

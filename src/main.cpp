@@ -70,19 +70,29 @@ public:
 
 		if (button == GLFW_MOUSE_BUTTON_RIGHT)
 		{
-			if (action == GLFW_PRESS)
+			if (action == GLFW_PRESS) {
 				rightMouseDown = true;
+			}
 			else if (action == GLFW_RELEASE)
 				rightMouseDown = false;
 		}
 
 		if (button == GLFW_MOUSE_BUTTON_LEFT)
 		{
-			if (action == GLFW_PRESS)
+			if (action == GLFW_PRESS) {
 				leftMouseDown = true;
+				lastLeftPressedFrame = currentFrame;
+			}
 			else if (action == GLFW_RELEASE)
 				leftMouseDown = false;
 		}
+	}
+
+	bool leftMouseJustPressed() {
+		return lastLeftPressedFrame == currentFrame;
+	}
+	void incrementFrameCount() {
+		currentFrame++;
 	}
 
 	// Updates the screen width and height, in screen coordinates
@@ -170,8 +180,30 @@ public:
 		return glm::vec2(mouseOldX, mouseOldY);
 	}
 
+	int indexOfPointAtCursorPos(std::vector<Vertex>& glCoordsOfPointsToSearch, float screenCoordThreshold, Camera current) {
+
+		std::vector<glm::vec3> screenCoordVerts;
+		for (const auto& v : glCoordsOfPointsToSearch) {
+			screenCoordVerts.push_back(glm::vec3(glPosToScreenCoords(current.getMousePos(glm::vec4(v.position, 1.f))), 0.f));
+		}
+
+		glm::vec2 screenMouse = cursorPosScreenCoords();
+		glm::vec3 cursorPosScreen(screenMouse.x + 0.5f, screenMouse.y + 0.5f, 0.f);
+
+		for (size_t i = 0; i < screenCoordVerts.size(); i++) {
+			// Return i if length of difference vector within threshold.
+			glm::vec3 diff = screenCoordVerts[i] - cursorPosScreen;
+			if (glm::length(diff) < screenCoordThreshold) {
+				return i;
+			}
+		}
+		return -1; // No point within threshold found.
+	}
+
 	bool rightMouseDown;
 	bool leftMouseDown;
+	int currentFrame;
+	int lastLeftPressedFrame;
 
 private:
 	// Uniform locations do not, ordinarily, change between frames.
@@ -225,6 +257,15 @@ private:
 	ShaderProgram &noLightingShader;
 	ShaderProgram &pickerShader;
 	Camera &camera;
+
+	glm::vec2 glPosToScreenCoords(glm::vec2 glPos) {
+		// Convert the [-1, 1] range to [0, 1]
+		glm::vec2 scaledZeroOne = 0.5f * (glPos + glm::vec2(1.f, 1.f));
+
+		glm::vec2 flippedY = glm::vec2(scaledZeroOne.x, 1.0f - scaledZeroOne.y);
+		glm::vec2 screenPos = flippedY * glm::vec2(screenWidth, screenHeight);
+		return screenPos;
+	}
 };
 
 std::vector<Line> generateAxisLines()
@@ -412,7 +453,8 @@ int main()
 	std::vector<Mesh> meshes;
 	Mesh *meshInProgress = nullptr;
 
-	glm::vec3 lineColor{0.0f, 1.0f, 0.0f};
+	glm::vec3 lineColor{0.0f, 1.0f, 0.7f};
+	glm::vec3 stashedColor{ 0.f, 1.f, 0.7f };
 	std::vector<Line> lines;
 	Line *lineInProgress = nullptr;
 	float pointEpsilon = 0.01f;
@@ -421,7 +463,19 @@ int main()
 	std::vector<Line> bounds;
 	Line *boundInProgress = nullptr;
 
+	glm::vec3 black{0.f, 0.f, 0.f};
+	std::vector<Line> modify_points;
+	std::vector<Line> static_points;
+
+	Line* pointsInProgress = nullptr;
+
+	int selectedPointIndex = -1;
+	int selectedCurveIndex = -1;
+
+	float pointSize = 5.0f;
 	int precision = 150;
+
+	std::vector<int> ptmodify = std::vector{ -1,-1 };
 
 	// std::vector<Line> pinch;
 	// pinch.push_back(Line());
@@ -456,6 +510,7 @@ int main()
 	// RENDER LOOP
 	while (!window.shouldClose())
 	{
+		cb->incrementFrameCount();
 		glfwPollEvents();
 
 		// Detect Hovered Objects in FREE_VIEW
@@ -470,6 +525,8 @@ int main()
 			selectedObjectIndex = hoveredObjectIndex;
 			view = OBJECT_VIEW;
 			meshCol = meshes[selectedObjectIndex].color;
+			stashedColor = lineColor;
+			lineColor = meshCol;
 		}
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time. Only in DRAW_VIEW
@@ -503,15 +560,46 @@ int main()
 				lineInProgress->updateGPU();
 			}
 		}
-		else
+		else if (!(cb->leftMouseDown) && lineInProgress != nullptr)
 		{
-			if (lineInProgress != nullptr)
-			{
-				lineInProgress->ChaikinAlg(1, lineColor);
-				lineInProgress->updateGPU();
-				lineInProgress = nullptr;
+			lineInProgress->ChaikinAlg(2);
+			modify_points.emplace_back(Line(lineInProgress->verts));
+
+			pointsInProgress = &modify_points.back();
+			pointsInProgress->setColor(black);
+			pointsInProgress->updateGPU();
+
+			lineInProgress->BSpline(precision, lineColor);
+			lineInProgress->updateGPU();
+
+			pointsInProgress = nullptr;
+			lineInProgress = nullptr;
+		}
+
+		if (view == CURVE_VIEW && cb->leftMouseJustPressed()) {
+			selectedPointIndex = -1;
+			selectedCurveIndex = -1;
+			float threshold = pointSize;
+			for (int i = 0; i < modify_points.size(); i++) {
+				if (selectedPointIndex == -1) {
+					selectedPointIndex = cb->indexOfPointAtCursorPos(modify_points[i].verts, threshold, cam);
+					selectedCurveIndex = i;
+				}
 			}
 		}
+
+		else if (view == CURVE_VIEW && cb->leftMouseDown && selectedPointIndex != -1) {
+			modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
+			modify_points[selectedCurveIndex].updateGPU();
+
+			lines[selectedCurveIndex].verts = modify_points[selectedCurveIndex].verts;
+			lines[selectedCurveIndex].BSpline(precision, lines[selectedCurveIndex].col);
+			lines[selectedCurveIndex].updateGPU();
+
+			pointsInProgress = nullptr;
+			lineInProgress = nullptr;
+		}
+
 
 		// Start ImGui Frame
 		ImGui_ImplOpenGL3_NewFrame();
@@ -585,52 +673,41 @@ int main()
 			ImGui::Text(linesDrawn.c_str());
 			if (lines.size() == 2)
 				ImGui::PopStyleColor();
-			if (ImGui::Button("Clear Lines"))
-			{
-				lines.clear();
-			}
+			ImGui::ColorEdit3("New Object Color", (float*)&lineColor);
+			if (lines.size() > 0) {
+				if (ImGui::Button("Edit Curve(s)")) {
+					view = CURVE_VIEW;
 
+					static_points.clear();
+					
+					for (auto i = modify_points.begin(); i < modify_points.end(); i++) {
+						static_points.emplace_back(Line((*i).verts));
+					}
+
+				}
+				if (ImGui::Button("Clear Lines"))
+				{
+					lines.clear();
+				}
+			}
+			
 			if (lines.size() == 2)
 			{
 				if (ImGui::Button("Create Rotational Blending Surface"))
 				{
 					meshes.emplace_back();
 					meshInProgress = &meshes.back();
-					meshInProgress->bound1 = lines.back().verts;
+					meshInProgress->ctrlpts1 = modify_points.back().verts;
 					lines.pop_back();
-					meshInProgress->bound2 = lines.back().verts;
+					modify_points.pop_back();
+					meshInProgress->ctrlpts2 = modify_points.back().verts;
 					lines.pop_back();
-					meshInProgress->sweep = cam.getcircle(50);
+					modify_points.pop_back();
+					meshInProgress->sweep = cam.getcircle(precision);
 					meshInProgress->cam = cam;
 					meshInProgress->create(precision);
+					meshInProgress->setColor(lineColor);
 					meshInProgress->updateGPU();
-
-					bounds.emplace_back();
-					boundInProgress = &bounds.back();
-					for (auto i = (meshInProgress->bound1).verts.begin(); i < (meshInProgress->bound1).verts.end(); i++)
-					{
-						boundInProgress->verts.push_back(Vertex{(*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal});
-					}
-					boundInProgress->updateGPU();
-					boundInProgress = nullptr;
-
-					bounds.emplace_back();
-					boundInProgress = &bounds.back();
-					for (auto i = (meshInProgress->bound2).verts.begin(); i < (meshInProgress->bound2).verts.end(); i++)
-					{
-						boundInProgress->verts.push_back(Vertex{(*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal});
-					}
-					boundInProgress->updateGPU();
-					boundInProgress = nullptr;
-
-					bounds.emplace_back();
-					boundInProgress = &bounds.back();
-					for (auto i = (meshInProgress->sweep).verts.begin(); i < (meshInProgress->sweep).verts.end(); i++)
-					{
-						boundInProgress->verts.push_back(Vertex{(*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal});
-					}
-					boundInProgress->updateGPU();
-					boundInProgress = nullptr;
 
 					meshInProgress = nullptr;
 				}
@@ -642,6 +719,7 @@ int main()
 		ImGui::Begin(frameTitle.c_str());
 
 		ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
+		
 		if (ImGui::Button("Apply Color"))
 		{
 			meshes[selectedObjectIndex].setColor(meshCol);
@@ -649,7 +727,42 @@ int main()
 
 		if (ImGui::Button("Modify Object Curves")) {
 			view = CURVE_VIEW;
+			cam = meshes[selectedObjectIndex].cam;
+
+			lines.clear();
+			modify_points.clear();
+
+			lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts1.verts));
+			lineInProgress = &lines.back();
+
+			modify_points.emplace_back(Line(lineInProgress->verts));
+
+			lineInProgress->setColor(meshes[selectedObjectIndex].color);
+			lineInProgress->BSpline(precision, lineInProgress->col);
+			lineInProgress->updateGPU();
+			lineInProgress = nullptr;
+
+			pointsInProgress = &modify_points.back();
+			pointsInProgress->setColor(black);
+			pointsInProgress->updateGPU();
+			pointsInProgress = nullptr;
+
+			lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts2.verts));
+			lineInProgress = &lines.back();
+
+			modify_points.emplace_back(Line(lineInProgress->verts));
+
+			lineInProgress->setColor(meshes[selectedObjectIndex].color);
+			lineInProgress->BSpline(precision, lineInProgress->col);
+			lineInProgress->updateGPU();
+			lineInProgress = nullptr;
+
+			pointsInProgress = &modify_points.back();
+			pointsInProgress->setColor(black);
+			pointsInProgress->updateGPU();
+			pointsInProgress = nullptr;
 		}
+
 		if (ImGui::Button("Modify Object Profile")) {
 			view = PROFILE_VIEW;
 		}
@@ -667,16 +780,75 @@ int main()
 		if (ImGui::Button("Cancel"))
 		{
 			view = FREE_VIEW;
+			lineColor = stashedColor;
 			selectedObjectIndex = -1;
 		}
 		}
-		else if (view == CURVE_VIEW || view == PROFILE_VIEW || view == CROSS_VIEW) {
-			if (ImGui::Button("Cancel"))
-			{
-				view = OBJECT_VIEW
+		else if (view == CURVE_VIEW) {
+			if (selectedObjectIndex == -1) {
+				std::string frameTitle = "Curve Modification - Object " + std::to_string(int(meshes.size()) + int(floor((lines.size()-1)/2)));
+				ImGui::Begin(frameTitle.c_str());
+				if (ImGui::Button("Accept Changes"))
+				{
+					view = DRAW_VIEW;
+				}
+				if (ImGui::Button("Cancel")) {
+					lines.clear();
+					modify_points.clear();
+
+					for (auto i = static_points.begin(); i < static_points.end(); i++) {
+						modify_points.emplace_back(Line((*i).verts));
+						pointsInProgress = &modify_points.back();
+						pointsInProgress->updateGPU();
+
+						lines.emplace_back(Line(pointsInProgress->verts));
+						lineInProgress = &lines.back();
+						lineInProgress->setColor(lineColor);
+						lineInProgress->BSpline(precision, lineColor);
+						lineInProgress->updateGPU();
+
+						pointsInProgress = nullptr;
+						lineInProgress = nullptr;
+					}
+
+					view = DRAW_VIEW;
+				}
+			}
+			else {
+				std::string frameTitle = "Curve Modification - Object " + std::to_string(selectedObjectIndex);
+				ImGui::Begin(frameTitle.c_str());
+				if (ImGui::Button("Accept Changes"))
+				{
+					meshes[selectedObjectIndex].ctrlpts1 = modify_points.back().verts;
+					lines.pop_back();
+					modify_points.pop_back();
+					meshes[selectedObjectIndex].ctrlpts2 = modify_points.back().verts;
+					lines.pop_back();
+					modify_points.pop_back();
+					meshes[selectedObjectIndex].create(precision);
+					meshes[selectedObjectIndex].updateGPU();
+					view = OBJECT_VIEW;
+				}
+				if (ImGui::Button("Cancel"))
+				{
+					lines.pop_back();
+					modify_points.pop_back();
+					lines.pop_back();
+					modify_points.pop_back();
+					view = OBJECT_VIEW;
+				}
 			}
 		}
-
+		else if (view == PROFILE_VIEW || view == CROSS_VIEW) {
+			if (view == PROFILE_VIEW) {
+				std::string frameTitle = "Profile Modification - Object " + std::to_string(selectedObjectIndex);
+				ImGui::Begin(frameTitle.c_str());
+			}
+			else if (view == CROSS_VIEW) {
+				std::string frameTitle = "Cross-Section Modification - Object " + std::to_string(selectedObjectIndex);
+				ImGui::Begin(frameTitle.c_str());
+			}
+		}
 
 		if (ImGui::BeginPopupModal("ExportObjSuccessPopup"))
 		{
@@ -695,67 +867,6 @@ int main()
 				ImGui::CloseCurrentPopup();
 			ImGui::EndPopup();
 		}
-
-		// if (meshes.size() > 0) {
-		//	ImGui::SliderInt("Object Select", &meshchoice, 0, meshes.size());
-		// }
-
-		// if (lines.size() % 2 != 0 && lines.size() != 0) {
-		//	if (ImGui::Button("Update Sweep") && meshchoice != 0) {
-		//		meshes[meshchoice - 1].sweep = meshes[meshchoice - 1].cam.standardize(lines.back().verts);
-		//		lines.pop_back();
-		//		meshes[meshchoice - 1].create(75);
-		//		meshes[meshchoice - 1].updateGPU();
-		//
-		//		bounds.emplace_back();
-		//		boundInProgress = &bounds.back();
-		//		for (auto i = (meshes[meshchoice - 1].sweep).verts.begin(); i < (meshes[meshchoice - 1].sweep).verts.end(); i++) {
-		//			boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
-		//		}
-		//		boundInProgress->updateGPU();
-		//		boundInProgress = nullptr;
-		//	}
-		// }
-
-		// if (lines.size() % 2 == 0 && lines.size() != 0) {
-		//	if (ImGui::Button("Update Pinch") && meshchoice != 0) {
-
-		//		meshes[meshchoice - 1].pinch1 = lines.back().verts;
-		//		lines.pop_back();
-		//		meshes[meshchoice - 1].pinch2 = lines.back().verts;
-		//		lines.pop_back();
-		//		meshes[meshchoice - 1].create(75);
-		//		meshes[meshchoice - 1].updateGPU();
-
-		//		//sweep = true;
-		//	}
-		//}
-
-		// if (sweep) {
-		//	bounds.emplace_back();
-		//	boundInProgress = &bounds.back();
-
-		//	if (meshchoice == 0) {
-		//		if (sweep) {
-		//			sweeps[0].standardizesweep(ups[0], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
-		//		}
-		//		for (auto i = sweeps[0].verts.begin(); i < sweeps[0].verts.end(); i++) {
-		//			boundInProgress->verts.push_back((*i));
-		//		}
-		//	}
-		//	else {
-		//		if (sweep) {
-		//			sweeps[2 * (meshchoice - 1)].standardizesweep(ups[2 * (meshchoice - 1)], cam.getPos(), glm::vec3(1.f, 0.7f, 0.f));
-		//		}
-		//		for (auto i = sweeps[2 * (meshchoice - 1)].verts.begin(); i < sweeps[2 * (meshchoice - 1)].verts.end(); i++) {
-		//			boundInProgress->verts.push_back((*i));
-		//		}
-		//	}
-
-		//	boundInProgress->updateGPU();
-		//	boundInProgress = nullptr;
-		//	sweep = false;
-		//}
 
 		// Framerate display, in case you need to debug performance.
 		ImGui::Text("");
@@ -798,24 +909,26 @@ int main()
 		}
 
 		// Drawing Meshes (with Lighting)
-		lightingShader.use();
-		cb->lightingViewPipeline();
-		for (int i = 0; i < meshes.size(); i++)
-		{
-			float a = ambientStrength;
-			float d = diffuseConstant;
-			if ((selectedObjectIndex >= 0 && i == selectedObjectIndex) || (hoveredObjectIndex >= 0 && i == hoveredObjectIndex))
+		if (view != CURVE_VIEW) {
+			lightingShader.use();
+			cb->lightingViewPipeline();
+			for (int i = 0; i < meshes.size(); i++)
 			{
-				d += 0.2f;
-				a += 0.05f;
+				float a = ambientStrength;
+				float d = diffuseConstant;
+				if ((selectedObjectIndex >= 0 && i == selectedObjectIndex) || (hoveredObjectIndex >= 0 && i == hoveredObjectIndex))
+				{
+					d += 0.2f;
+					a += 0.05f;
+				}
+				else if ((selectedObjectIndex >= 0 && i != selectedObjectIndex) || hoveredObjectIndex >= 0 && i != hoveredObjectIndex)
+				{
+					d -= 0.2;
+					a -= 0.05f;
+				}
+				cb->updateShadingUniforms(lightPos, d, a);
+				meshes[i].draw();
 			}
-			else if ((selectedObjectIndex >= 0 && i != selectedObjectIndex) || hoveredObjectIndex >= 0 && i != hoveredObjectIndex)
-			{
-				d -= 0.2;
-				a -= 0.05f;
-			}
-			cb->updateShadingUniforms(lightPos, d, a);
-			meshes[i].draw();
 		}
 
 		// Drawing Lines (no Lighting)
@@ -824,6 +937,15 @@ int main()
 		for (Line &line : lines)
 		{
 			line.draw();
+		}
+		// Drawing Control Points (no Lighting)
+		if (view == CURVE_VIEW) {
+			noLightingShader.use();
+			cb->noLightingViewPipeline();
+			for (Line& ctrl : modify_points)
+			{
+				ctrl.drawPoints(pointSize);
+			}
 		}
 
 		// Drawing Lines (no Lighting)
