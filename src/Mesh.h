@@ -38,8 +38,8 @@ void orderlines(std::vector<Vertex>& Line1, std::vector<Vertex>& Line2) {
 
 std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
 	std::vector<Vertex> axis;
-	std::vector<Vertex> Spline1 = l1.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
-	std::vector<Vertex> Spline2 = l2.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
+	std::vector<Vertex> Spline1 = l1.BSpline(sprecision);
+	std::vector<Vertex> Spline2 = l2.BSpline(sprecision);
 
 	orderlines(Spline1, Spline2);
 
@@ -79,8 +79,8 @@ public:
 		indices.clear();
 
 		std::vector<Vertex> axis;
-		std::vector<Vertex> Spline1 = bound1.verts;
-		std::vector<Vertex> Spline2 = bound2.verts;
+		std::vector<Vertex> Spline1 = bound1.BSpline(sprecision);
+		std::vector<Vertex> Spline2 = bound2.BSpline(sprecision);
 
 		orderlines(Spline1, Spline2);
 
