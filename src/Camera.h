@@ -24,7 +24,7 @@ public:
 	glm::vec2 getMousePos(glm::vec4 cursorIn);
 
 	std::vector<Vertex> getcircle(int inc);
-	std::vector<Vertex> standardize(std::vector<Vertex>);
+	void standardize(std::vector<Vertex> &myverts);
 	
 	void incrementTheta(float dt);
 	void incrementPhi(float dp);

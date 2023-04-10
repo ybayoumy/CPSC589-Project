@@ -114,49 +114,15 @@ std::vector<Vertex> Camera::getcircle(int inc) {
 	return circle;
 }
 
-std::vector<Vertex> Camera::standardize(std::vector<Vertex> line) {
+void Camera::standardize(std::vector<Vertex> &myverts) {
 	std::vector<Vertex> temp;
-	temp = line;
 
-	glm::vec3 eye = radius * glm::vec3(std::cos(theta) * std::sin(phi), std::sin(theta), std::cos(theta) * std::cos(phi));
-	glm::vec3 at = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 up = getUp();
-
-	line.clear();
-	for (int j = 0; j < temp.size(); j++) {
-		// GET POINTS INTO XY PLANE
-		glm::vec3 newvert = getView() * glm::vec4(temp[j].position, 1.f);
-		line.push_back(Vertex{ newvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
-	}
-
-	std::sort(temp.begin(), temp.end(), xdescend);
-
-	glm::vec3 xmax = temp[0].position;
-	glm::vec3 xmin = temp.back().position;
-
-	std::sort(temp.begin(), temp.end(), ydescend);
-
-	glm::vec3 ymax = temp[0].position;
-	glm::vec3 ymin = temp.back().position;
-
-	glm::vec3 center;
-	if (glm::vec3(0.f, 1.f, 0.f).y != 0) {
-		center = 0.5f * (ymin + ymax);
-	}
-
-	float yd = fabs(ymax.y - ymin.y);
-
-	temp = line;
-	line.clear();
-	for (int j = 0; j < temp.size(); j++) {
-		// MOVE AND SCALE
-		glm::vec3 newvert = glm::scale(glm::mat4(1.f), glm::vec3(2 / yd, 2 / yd, 0)) * glm::translate(glm::mat4(1.f), -center) * glm::vec4(temp[j].position, 1.f);
-		// PUSH TO SCREEN
-		newvert = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, -radius)) * glm::vec4(newvert, 1.f);
+	for (auto j = myverts.begin(); j < myverts.end(); j++) {
 		// ROTATE W.R.T AXIS
-		newvert = glm::rotate(glm::mat4(1.f), float(M_PI_2), up) * glm::inverse(glm::lookAt(eye, at, glm::vec3(0.f, 1.f, 0.f))) * glm::vec4(newvert, 1.f);
-		line.push_back(Vertex{ newvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
+		glm::vec3 newvert = glm::rotate(glm::mat4(1.f), float(M_PI_2), getUp()) * glm::vec4((*j).position, 1.f);
+		temp.push_back(Vertex{ newvert, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f) });
 	}
 
-	return line;
+	myverts.clear();
+	myverts = temp;
 }

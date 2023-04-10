@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <glm/gtx/vector_angle.hpp>
 #include <vector>
 #include <memory>
 #include <string>
@@ -167,6 +168,31 @@ public:
 		}
 
 		verts = spline;
+	}
+
+	void getCrossSection(Camera current, glm::vec3 fixed) {
+		glm::vec3 p1 = verts[0].position;
+		glm::vec3 p2 = verts.back().position;
+
+		glm::vec3 center = 0.5f * (p1 + p2);
+		glm::vec3 d = p2 - p1;
+		float dtheta = glm::orientedAngle(glm::normalize(current.getUp()), glm::normalize(d), -glm::normalize(current.getPos()));
+
+		glm::mat4 T1 = glm::translate(glm::mat4(1.f), -center);
+		glm::mat4 R1 = glm::rotate(glm::mat4(1.f), -dtheta, -current.getPos());
+		glm::mat4 S1 = glm::scale(glm::mat4(1.f), glm::vec3(-1.f, 1.f, 0.f));
+		glm::mat4 S2 = glm::scale(glm::mat4(1.f), glm::vec3(2 / glm::length(d), 2 / glm::length(d), 2/ glm::length(d)) * fixed);
+
+		std::vector<Vertex> temp = verts;
+		verts.clear();
+		for (int i = 0; i < temp.size() - 1; i++) {
+			glm::vec3 newp = (S2 * R1 * T1 * glm::vec4(temp[i].position, 1.f));
+			verts.push_back(Vertex{ newp, col, glm::vec3(0.f, 0.f, 0.f) });
+		}
+		for (int j = temp.size() - 1; j > 0; j--) {
+			glm::vec3 newp2 = (S2 * S1 * R1 * T1 * glm::vec4(temp[j].position, 1.f));
+			verts.push_back(Vertex{ newp2, col, glm::vec3(0.f, 0.f, 0.f) });
+		}
 	}
 
 	void updateGPU() {

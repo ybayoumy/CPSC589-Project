@@ -525,7 +525,9 @@ int main()
 		PROFILE_VIEW,
 		PROFILE_DRAW,
 		PROFILE_EDIT,
-		CROSS_VIEW
+		CROSS_VIEW,
+		CROSS_DRAW,
+		CROSS_EDIT
 	};
 	ViewType view = FREE_VIEW;
 
@@ -552,10 +554,10 @@ int main()
 		}
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time. Only in DRAW_VIEW
-		if ((view == DRAW_VIEW || view == PROFILE_DRAW) && cb->leftMouseDown)
+		if ((view == DRAW_VIEW || view == PROFILE_DRAW || view == CROSS_DRAW) && cb->leftMouseDown)
 		{
 			glm::vec4 cursorPos;
-			if (view == DRAW_VIEW) {
+			if (view == DRAW_VIEW || view == CROSS_DRAW) {
 				cursorPos = cam.getCursorPos(cb->getCursorPosGL());
 			}
 			else if (view == PROFILE_DRAW) {
@@ -582,13 +584,59 @@ int main()
 				}
 
 				lineInProgress->updateGPU();
+
+				if (view == CROSS_DRAW) {
+					if (cb->indexOfPointAtCursorPos(static_points[abs(1 - selectedCurveIndex)].verts, pointSize, cam) != -1) {
+						lineInProgress->verts.push_back(static_points[abs(1-selectedCurveIndex)].verts[selectedPointIndex]);
+						selectedCurveIndex = -1;
+						selectedPointIndex = -1;
+						lineInProgress->updateGPU();
+
+						lineInProgress->ChaikinAlg(2);
+						modify_points.emplace_back(Line(lineInProgress->verts));
+
+						pointsInProgress = &modify_points.back();
+						pointsInProgress->setColor(black);
+						pointsInProgress->updateGPU();
+
+						lineInProgress->BSpline(precision, lineColor);
+						lineInProgress->updateGPU();
+
+						pointsInProgress = nullptr;
+						lineInProgress = nullptr;
+
+						view = CROSS_EDIT;
+					}
+				}
+
 			}
-			else if (lines.size() < 2)
+			else if ((view == DRAW_VIEW || view == PROFILE_DRAW) && lines.size() < 2)
 			{
 				// create a new line
 				lines.emplace_back(std::vector<Vertex>{Vertex{ cursorPos, lineColor, glm::vec3(0.0f) }});
 				lineInProgress = &lines.back();
 				lineInProgress->updateGPU();
+			}
+			else if (view == CROSS_DRAW && lines.size() < 3) {
+				selectedPointIndex = -1;
+				for (int i = 0; i < static_points.size(); i++) {
+					if (selectedPointIndex == -1) {
+						selectedPointIndex = cb->indexOfPointAtCursorPos(static_points[i].verts, pointSize, cam);
+						selectedCurveIndex = i;
+						
+						if (selectedPointIndex != -1) {
+							static_points[selectedCurveIndex].verts[selectedPointIndex].color = lineColor;
+							static_points[selectedCurveIndex].updateGPU();
+							static_points[abs(1 - selectedCurveIndex)].verts[selectedPointIndex].color = lineColor;
+							static_points[abs(1 - selectedCurveIndex)].updateGPU();
+
+							// create a new line
+							lines.emplace_back(std::vector<Vertex>{static_points[selectedCurveIndex].verts[selectedPointIndex], Vertex{ cursorPos, lineColor, glm::vec3(0.0f) }});
+							lineInProgress = &lines.back();
+							lineInProgress->updateGPU();
+						}
+					}
+				}
 			}
 		}
 		else if (!(cb->leftMouseDown) && lineInProgress != nullptr)
@@ -607,11 +655,11 @@ int main()
 			lineInProgress = nullptr;
 		}
 
-		if ((view == CURVE_VIEW || view == PROFILE_EDIT) && cb->leftMouseJustPressed()) {
+		if ((view == CURVE_VIEW || view == CROSS_EDIT || view == PROFILE_EDIT) && cb->leftMouseJustPressed()) {
 			selectedPointIndex = -1;
 			selectedCurveIndex = -1;
 			float threshold = pointSize;
-			if (view == CURVE_VIEW || view == PROFILE_EDIT) {
+			if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT) {
 				for (int i = 0; i < modify_points.size(); i++) {
 					if (selectedPointIndex == -1) {
 						selectedPointIndex = cb->indexOfPointAtCursorPos(modify_points[i].verts, threshold, cam);
@@ -621,7 +669,7 @@ int main()
 			}
 		}
 
-		else if ((view == CURVE_VIEW || view == PROFILE_EDIT) && cb->leftMouseDown && selectedPointIndex != -1) {
+		else if ((view == CURVE_VIEW || view == CROSS_EDIT || view == PROFILE_EDIT) && cb->leftMouseDown && selectedPointIndex != -1) {
 			if (view == CURVE_VIEW) {
 				modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
 				modify_points[selectedCurveIndex].updateGPU();
@@ -629,6 +677,14 @@ int main()
 				lines[selectedCurveIndex].verts = modify_points[selectedCurveIndex].verts;
 				lines[selectedCurveIndex].BSpline(precision, lines[selectedCurveIndex].col);
 				lines[selectedCurveIndex].updateGPU();
+			}
+			else if (view == CROSS_EDIT) {
+				modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
+				modify_points[selectedCurveIndex].updateGPU();
+
+				lines[selectedCurveIndex+2].verts = modify_points[selectedCurveIndex].verts;
+				lines[selectedCurveIndex+2].BSpline(precision, lines[selectedCurveIndex].col);
+				lines[selectedCurveIndex+2].updateGPU();
 			}
 			else if (view == PROFILE_EDIT) {
 				glm::vec3 fixed = meshes[selectedObjectIndex].fixed;
@@ -814,6 +870,46 @@ int main()
 			}
 			if (ImGui::Button("Modify Object Cross-Section")) {
 				view = CROSS_VIEW;
+				cam = meshes[selectedObjectIndex].cam;
+
+				lines.clear();
+				modify_points.clear();
+
+				lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts1.verts));
+				lineInProgress = &lines.back();
+
+				static_points.emplace_back(Line(lineInProgress->verts));
+
+				lineInProgress->setColor(black);
+				lineInProgress->BSpline(precision, lineInProgress->col);
+				lineInProgress->updateGPU();
+				lineInProgress = nullptr;
+
+				pointsInProgress = &static_points.back();
+				pointsInProgress->setColor(black);
+				pointsInProgress->BSpline(20, black);
+				pointsInProgress->updateGPU();
+				pointsInProgress = nullptr;
+
+				lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts2.verts));
+				lineInProgress = &lines.back();
+
+				static_points.emplace_back(Line(lineInProgress->verts));
+
+				lineInProgress->setColor(black);
+				lineInProgress->BSpline(precision, lineInProgress->col);
+				lineInProgress->updateGPU();
+				lineInProgress = nullptr;
+
+				pointsInProgress = &static_points.back();
+				pointsInProgress->setColor(black);
+				pointsInProgress->BSpline(20, black);
+				pointsInProgress->updateGPU();
+				pointsInProgress = nullptr;
+
+				stashedColor = lineColor;
+				lineColor = meshes[selectedObjectIndex].color;
+
 			}
 
 			ImGui::Text("");
@@ -1033,7 +1129,45 @@ int main()
 		else if (view == CROSS_VIEW) {
 			std::string frameTitle = "Cross-Section Modification - Object " + std::to_string(selectedObjectIndex);
 			ImGui::Begin(frameTitle.c_str());
+
+			if (ImGui::Button("Draw New Object Cross-Section")) {
+				view = CROSS_DRAW;
+			}
+			if (ImGui::Button("Edit Existing Object Cross-Section")) {
+				view = CROSS_EDIT;
+			}
+			if (ImGui::Button("Cancel")) {
+				static_points.clear();
+				modify_points.clear();
+				lines.clear();
+				view = OBJECT_VIEW;
+			}
 		}
+		else if (view == CROSS_EDIT || view == CROSS_DRAW) {
+			std::string frameTitle = "Cross-Section Modification - Object " + std::to_string(selectedObjectIndex);
+			ImGui::Begin(frameTitle.c_str());
+			
+			if (lines.size() == 3){
+				if (ImGui::Button("Accept Changes")) {
+					Line newcross;
+					meshes[selectedObjectIndex].setcrosssection(modify_points.back().verts, meshes[selectedObjectIndex].fixed, precision);
+					lines.clear();
+					modify_points.clear();
+					static_points.clear();
+
+					meshes[selectedObjectIndex].create(precision);
+					meshes[selectedObjectIndex].updateGPU();
+
+					view = CROSS_VIEW;
+				}
+			}
+			
+			if (ImGui::Button("Cancel")) {
+				modify_points.clear();
+				view = CROSS_VIEW;
+			}
+		}
+
 
 		if (ImGui::BeginPopupModal("ExportObjSuccessPopup"))
 		{
@@ -1094,7 +1228,7 @@ int main()
 		}
 
 		// Drawing Meshes (with Lighting)
-		if (view != CURVE_VIEW && view != PROFILE_EDIT) {
+		if (view != CURVE_VIEW && view != PROFILE_EDIT && view != CROSS_EDIT && view != CROSS_DRAW) {
 			lightingShader.use();
 			cb->lightingViewPipeline();
 			for (int i = 0; i < meshes.size(); i++)
@@ -1124,18 +1258,25 @@ int main()
 			line.draw();
 		}
 		// Drawing Control Points (no Lighting)
-		if (view == CURVE_VIEW || view == PROFILE_EDIT) {
+		if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_DRAW || view == CROSS_EDIT) {
 			noLightingShader.use();
 			cb->noLightingViewPipeline();
 			for (Line& ctrl : modify_points)
 			{
 				ctrl.drawPoints(pointSize);
 			}
+			if (view == CROSS_EDIT || view == CROSS_DRAW) {
+				noLightingShader.use();
+				cb->noLightingViewPipeline();
+				for (Line& ctrl : static_points)
+				{
+					ctrl.drawPoints(pointSize);
+				}
+			}
 		}
 
 		// Drawing Lines (no Lighting)
-		if (showbounds)
-		{
+		if (showbounds){
 			noLightingShader.use();
 			cb->noLightingViewPipeline();
 			for (Line &bound : bounds)

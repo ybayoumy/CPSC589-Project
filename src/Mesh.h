@@ -138,6 +138,8 @@ public:
 
 	glm::vec3 color;
 
+	Line crosssection;
+
 	Line bound1;
 	Line bound2;
 	Line sweep;
@@ -343,6 +345,20 @@ public:
 		output.emplace_back(Line(output2.verts));
 
 		return output;
+	}
+
+	void setcrosssection(std::vector<Vertex> cross, glm::vec3 fixed, int precision) {
+		crosssection = cross;
+
+		Line temp;
+		temp = Line(cross);
+		temp.getCrossSection(cam, fixed);
+		cam.standardize(temp.verts);
+
+		crosssection = temp.verts;
+		temp.BSpline(precision, color);
+
+		sweep = temp.verts;
 	}
 
 	void draw() {
