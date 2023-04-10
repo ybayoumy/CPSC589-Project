@@ -20,6 +20,7 @@ public:
 	glm::vec3 getPos();
 	glm::vec3 getUp();
 	glm::vec4 getCursorPos(glm::vec2 mouseIn);
+	glm::vec4 getCursorPosOP(glm::vec2 mouseIn, glm::vec3 fixed, glm::vec3 nochange, glm::vec3 drawaxis, glm::vec3 axisstart);
 	glm::vec2 getMousePos(glm::vec4 cursorIn);
 
 	std::vector<Vertex> getcircle(int inc);

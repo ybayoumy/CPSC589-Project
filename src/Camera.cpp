@@ -48,6 +48,23 @@ glm::vec4 Camera::getCursorPos(glm::vec2 mouseIn) {
 	return cursorPos;
 }
 
+glm::vec4 Camera::getCursorPosOP(glm::vec2 mouseIn, glm::vec3 fixed, glm::vec3 nochange, glm::vec3 drawaxis, glm::vec3 axisstart) {
+	glm::vec3 ref = fixed - nochange;
+
+	glm::vec4 cursorPos = getCursorPos(mouseIn);
+
+	glm::vec3 y = glm::vec4(nochange, 1.f) * cursorPos;
+	glm::vec3 m = nochange * drawaxis;
+
+	float t = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+	float disttoaxis = glm::distance(ref * getPos(), ref * (axisstart + drawaxis * t));
+
+	cursorPos = glm::vec4(mouseIn * glm::tan(glm::radians(22.5f)) * disttoaxis, -disttoaxis, 1.0f);
+	cursorPos = glm::inverse(getView()) * cursorPos;
+
+	return cursorPos;
+}
+
 glm::vec2 Camera::getMousePos(glm::vec4 cursorIn) {
 	glm::vec4 mousePos = getView() * cursorIn;
 	float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * radius;

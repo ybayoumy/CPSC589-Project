@@ -134,6 +134,7 @@ public:
 	std::vector<unsigned int> indices;
 
 	std::vector<Vertex> axis;
+	std::vector<std::vector<Vertex>> discs;
 
 	glm::vec3 color;
 
@@ -158,7 +159,26 @@ public:
 
 	GPU_Geometry geometry;
 
+	std::vector<Vertex> stdgetdisc(glm::vec3 cvert, glm::vec3 diameter, float theta) {
+		std::vector<Vertex> disc;
+
+		float scale = 0.5 * glm::length(diameter);
+		
+		glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
+		glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
+		glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
+
+		for (int j = 0; j < sweep.verts.size(); j++) {
+			glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
+			glm::vec3 normal = glm::normalize(point - cvert);
+			disc.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+		}
+
+		return disc;
+	}
+
 	void create(int sprecision) {
+		discs.clear();
 		verts.clear();
 		indices.clear();
 		axis.clear();
@@ -207,8 +227,6 @@ public:
 			scale = 0.5 * glm::length(diameter);
 			theta = glm::orientedAngle(glm::normalize(cam.getUp()), glm::normalize(diameter), -glm::normalize(cam.getPos()));
 
-			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
-
 			if (temppinch1.verts.size() > 0 && temppinch2.verts.size() > 0) {
 				glm::vec3 P1 = closestvec(temppinch1.verts, cvert, up);
 				glm::vec3 P2 = closestvec(temppinch2.verts, cvert, up);
@@ -219,16 +237,24 @@ public:
 				float pscale = 0.5 * glm::length(pdiameter);
 				glm::vec3 scaleby = pscale * unfixed + scale * fixed;
 
-				S = glm::scale(glm::mat4(1.f), scaleby);
+				glm::mat4 S = glm::scale(glm::mat4(1.f), scaleby);
+				glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
+				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
+
+				for (int j = 0; j < sweep.verts.size(); j++) {
+					glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
+					glm::vec3 normal = glm::normalize(point - cvert);
+					verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+				}
 			}
 
-			glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
-			glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
-		
-			for (int j = 0; j < sweep.verts.size(); j++) {
-				glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
-				glm::vec3 normal = glm::normalize(point - cvert);
-				verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+			else {
+				std::vector<Vertex> disc = stdgetdisc(cvert, diameter, theta);
+				int k = 0;
+				for (auto j = disc.begin(); j < disc.end(); j++) {
+					verts.emplace_back((*j));
+				}
+				discs.push_back(disc);
 			}
 
 			if (i == sprecision) {
@@ -259,10 +285,7 @@ public:
 		return point;
 	}
 
-	void setPinch(int sprecision, glm::vec3 current) {
-
-		//pinch1.BSpline(sprecision, glm::vec3(0.f));
-		//pinch2.BSpline(sprecision, glm::vec3(0.f));
+	void setPinch(glm::vec3 current) {
 		
 		std::vector<Vertex> P1 = pinch1.verts;
 		std::vector<Vertex> P2 = pinch2.verts;
@@ -276,26 +299,6 @@ public:
 		glm::vec3 center1 = 0.5f * (P1[0].position + P1.back().position);
 		glm::vec3 center2 = 0.5f * (P2[0].position + P2.back().position);
 		glm::vec3 newcenter = 0.5f * (axis[0].position + axis.back().position);
-
-		//glm::vec3 newcenter = glm::vec3(0.f);
-
-		//float height1 = glm::distance(nochange * glm::vec3(P1[0].position), nochange * glm::vec3(P1.back().position));
-		//float height2 = glm::distance(nochange * glm::vec3(P2[0].position), nochange * glm::vec3(P2.back().position));
-
-		//float newheight = glm::distance(nochange * axis[0].position, nochange * axis.back().position);
-	
-		//float scale1 = newheight / height1;
-		//float scale2 = newheight / height2;
-
-		//for (int i = 0; i < P1.size(); i++) {
-		//	P1[i].position = (scale1 * (P1[i].position - center1)) + newcenter;
-		//}
-		//for (int j = 0; j < P2.size(); j++) {
-		//	P2[j].position = (scale2 * (P2[j].position - center2)) + newcenter;
-		//}
-
-
-		//glm::vec3 toline = glm::abs(glm::normalize(current) - nochange);
 
 		for (auto i = P1.begin(); i < P1.end(); i++) {
 			glm::vec3 y = nochange * (*i).position;
@@ -318,6 +321,28 @@ public:
 		pinch2 = Line(P2);
 
 		up = nochange;
+	}
+
+	std::vector<Line> getPinches(int sprecision) {
+		std::vector<Line> output;
+		Line output1;
+		Line output2;
+
+		for (auto i = discs.begin(); i < discs.end(); i++){
+
+			std::vector<Vertex> disc = (*i);
+			output1.verts.push_back(disc[0]);
+			output2.verts.push_back(disc[floor(sprecision/2)]);
+
+		}
+
+		output1.ChaikinAlg(2);
+		output2.ChaikinAlg(2);
+
+		output.emplace_back(Line(output1.verts));
+		output.emplace_back(Line(output2.verts));
+
+		return output;
 	}
 
 	void draw() {
