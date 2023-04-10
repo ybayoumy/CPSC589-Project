@@ -37,6 +37,20 @@ void orderlines(std::vector<Vertex>& Line1, std::vector<Vertex>& Line2) {
 	}
 }
 
+glm::vec3 closestvec(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
+	glm::vec3 closest = glm::vec3 (10.f, 10.f, 10.f);
+	float min = 10.f;
+
+	for (auto i = points.begin(); i < points.end(); i++) {
+		float distance = glm::distance(ref * (*i).position, ref * point);
+		if (distance < min) {
+			closest = (*i).position;
+			min = distance;
+		}
+	}
+	return closest;
+}
+
 std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
 	l1.BSpline(sprecision, glm::vec3(0.f));
 	l2.BSpline(sprecision, glm::vec3(0.f));
@@ -55,11 +69,71 @@ std::vector<Vertex> centeraxis(Line l1, Line l2, int sprecision) {
 	return axis;
 }
 
+void updateindices(std::vector<unsigned int> &indices, int sweepsize, int sprecision) {
+	indices.clear();
+	
+	for (int i = 1; i <= sweepsize; i++) {
+		if (i == sweepsize) {
+			indices.push_back(0 + 1);
+			indices.push_back(0);
+			indices.push_back(i);
+		}
+		else {
+			indices.push_back(i + 1);
+			indices.push_back(0);
+			indices.push_back(i);
+		}
+	}
+
+	// creating faces using vertex indices
+	for (int i = 1; i <= sweepsize; i++) {
+		for (int j = 0; j <= sprecision; j++) {
+			if (i != sweepsize) {
+				if (j != 0) {
+					indices.push_back((sweepsize) * j + i + 1);
+					indices.push_back((sweepsize) * (j - 1) + i + 1);
+					indices.push_back((sweepsize) * j + i - 1 + 1);
+				}
+				if (j != sprecision) {
+					indices.push_back((sweepsize) * j + i + 1);
+					indices.push_back((sweepsize) * j + i - 1 + 1);
+					indices.push_back((sweepsize) * (j + 1) + i - 1 + 1);
+				}
+			}
+			else {
+				if (j != 0) {
+					indices.push_back((sweepsize) * (j)+0 + 1);
+					indices.push_back((sweepsize) * (j - 1) + 0 + 1);
+					indices.push_back((sweepsize) * (j)+sweepsize - 1 + 1);
+				}
+				if (j != sprecision) {
+					indices.push_back((sweepsize) * j + 0 + 1);
+					indices.push_back((sweepsize) * j + sweepsize - 1 + 1);
+					indices.push_back((sweepsize) * (j + 1) + sweepsize - 1 + 1);
+				}
+			}
+		}
+	}
+
+	for (int i = 1; i <= sweepsize; i++) {
+		indices.push_back(sweepsize * (sprecision + 1) - (i - 1));
+		indices.push_back(sweepsize * (sprecision + 1) + 1);
+		indices.push_back(sweepsize * (sprecision + 1) - (i - 2));
+		if (i == sweepsize) {
+			indices.push_back(sweepsize * (sprecision + 1) - 0);
+			indices.push_back(sweepsize * (sprecision + 1) + 1);
+			indices.push_back(sweepsize * (sprecision + 1) - (i - 1));
+		}
+	}
+}
+
 class Mesh
 {
 public:
 	std::vector<Vertex> verts;
 	std::vector<unsigned int> indices;
+
+	std::vector<Vertex> axis;
 
 	glm::vec3 color;
 
@@ -70,8 +144,12 @@ public:
 	Line ctrlpts1;
 	Line ctrlpts2;
 
-	//Line pinch1;
-	//Line pinch2;
+	Line pinch1;
+	Line pinch2;
+
+	glm::vec3 fixed;
+	glm::vec3 unfixed;
+	glm::vec3 up;
 
 	//glm::vec3 direction;
 	//glm::vec3 updirection;
@@ -83,8 +161,7 @@ public:
 	void create(int sprecision) {
 		verts.clear();
 		indices.clear();
-
-		std::vector<Vertex> axis;
+		axis.clear();
 
 		bound1 = Line(ctrlpts1.verts);
 		bound2 = Line(ctrlpts2.verts);
@@ -95,60 +172,31 @@ public:
 		std::vector<Vertex> Spline1 = bound1.verts;
 		std::vector<Vertex> Spline2 = bound2.verts;
 
+		Line temppinch1;
+		Line temppinch2;
+
+		temppinch1 = Line(pinch1.verts);
+		temppinch2 = Line(pinch2.verts);
+
+		if (temppinch1.verts.size() > 0 && temppinch2.verts.size() > 0) {
+			temppinch1.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
+			temppinch2.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
+		}
+
 		glm::vec3 cvert = glm::vec3(0.f);
 		glm::vec3 diameter = glm::vec3(0.f);
 		float scale;
 		float theta;
 
+		fixed = glm::vec3(1.f) - glm::normalize(glm::abs(cam.getPos()));
+		unfixed = glm::normalize(glm::vec3(cam.getPos().x, cam.getPos().y, -cam.getPos().z));
+
 		orderlines(Spline1, Spline2);
 
-		//if (pinch1.verts.size() > 0 && pinch2.verts.size() > 0){
-		//	std::vector<Vertex> PSpline1 = pinch1.BSpline(sprecision);
-		//	std::vector<Vertex> PSpline2 = pinch2.BSpline(sprecision);
-
-		//	orderlines(PSpline1, PSpline2);
-
-		//	glm::vec3 eye = cam.getPos();
-		//	glm::vec3 at = glm::vec3(0.f, 0.f, 0.f);
-
-		//	glm::mat4 UnRot = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, cam.radius)) * glm::lookAt(eye, at, glm::vec3(0.f, 1.f, 0.f)) * glm::rotate(glm::mat4(1.f), -float(M_PI_2), cam.getUp());
-
-		//	for (int i = 0; i <= sprecision; i++) {
-		//		glm::vec3 cvert = axis[i].position;
-		//		glm::vec3 diameter = Spline1[i].position - Spline2[i].position;
-		//		glm::vec3 xdiameter = PSpline1[i].position - PSpline2[i].position;
-
-		//		float xscale = 0.5 * glm::length(xdiameter);
-		//		float scale = 0.5 * glm::length(diameter);
-
-		//		float pratio = xscale / scale;
-
-		//		float theta = glm::acos(glm::dot(glm::normalize(diameter), glm::normalize(cam.getUp())));
-
-		//		glm::mat4 PScale = glm::scale(glm::mat4(1.f), glm::vec3(pratio, 1, pratio));
-
-		//		glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{scale, scale, scale});
-		//		glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, cam.getPos());
-		//		glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
-
-		//		for (auto j = sweep.verts.begin(); j < sweep.verts.end(); j++) {
-		//			//glm::vec3 point = T * R * S * glm::inverse(UnRot) * PScale * 
-		//			// obtain standardized sweep
-		//			glm::vec3 point = UnRot * glm::vec4((*j).position, 1.f);
-		//			// return to position, move to rotational blending surface
-		//			point = T * R * S * glm::inverse(UnRot) * PScale * glm::vec4(point, 1.f);
-
-		//			//std::cout << point << std::endl;
-
-		//			glm::vec3 normal = glm::normalize(point - cvert);
-		//			verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
-		//		}
-		//	}
-		//}
-		//else {
 		for (int i = 0; i <= sprecision; i++) {
 
 			cvert = 0.5f * (Spline1[i].position + Spline2[i].position);
+			axis.push_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
 
 			if (i == 0) {
 				glm::vec3 cvertnext = 0.5f * Spline1[i+1].position + 0.5f * Spline2[i+1].position;
@@ -160,6 +208,20 @@ public:
 			theta = glm::orientedAngle(glm::normalize(cam.getUp()), glm::normalize(diameter), -glm::normalize(cam.getPos()));
 
 			glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
+
+			if (temppinch1.verts.size() > 0 && temppinch2.verts.size() > 0) {
+				glm::vec3 P1 = closestvec(temppinch1.verts, cvert, up);
+				glm::vec3 P2 = closestvec(temppinch2.verts, cvert, up);
+				glm::vec3 pdiameter = P2 - P1;
+
+				cvert = (cvert * fixed) + ((0.5f * (P1 + P2)) * glm::abs(unfixed));
+
+				float pscale = 0.5 * glm::length(pdiameter);
+				glm::vec3 scaleby = pscale * unfixed + scale * fixed;
+
+				S = glm::scale(glm::mat4(1.f), scaleby);
+			}
+
 			glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
 			glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 		
@@ -175,62 +237,87 @@ public:
 			}
 		
 		}
-		//}
+
+		updateindices(indices, sweep.verts.size(), sprecision);
+
+		temppinch1.verts.clear();
+		temppinch2.verts.clear();
+
+	}
+
+	glm::vec3 getAxis() {
+		glm::vec3 avgaxis = axis.back().position - axis[0].position;
+		return glm::normalize(avgaxis);
+	}
+
+	glm::vec3 getPoint(glm::vec3 fix) {
+		glm::vec3 y = fix * axis[0].position;
+		glm::vec3 m = fix * getAxis();
+
+		float t = (-(y.x + y.y + y.z)) / (m.x + m.y + m.z);
+		glm::vec3 point = getAxis() * t + axis[0].position;
+		return point;
+	}
+
+	void setPinch(int sprecision, glm::vec3 current) {
+
+		//pinch1.BSpline(sprecision, glm::vec3(0.f));
+		//pinch2.BSpline(sprecision, glm::vec3(0.f));
 		
-		for (int i = 1; i <= sweep.verts.size(); i++) {
-			if (i == sweep.verts.size()) {
-				indices.push_back(0 + 1);
-				indices.push_back(0);
-				indices.push_back(i);
-			}
-			else {
-				indices.push_back(i + 1);
-				indices.push_back(0);
-				indices.push_back(i);
-			}	
+		std::vector<Vertex> P1 = pinch1.verts;
+		std::vector<Vertex> P2 = pinch2.verts;
+
+		glm::vec3 nochange = fixed - glm::normalize(glm::abs(current));
+		glm::vec3 drawaxis = getAxis();
+		glm::vec3 axisstart = getPoint(nochange);
+
+		orderlines(P1, P2);
+
+		glm::vec3 center1 = 0.5f * (P1[0].position + P1.back().position);
+		glm::vec3 center2 = 0.5f * (P2[0].position + P2.back().position);
+		glm::vec3 newcenter = 0.5f * (axis[0].position + axis.back().position);
+
+		//glm::vec3 newcenter = glm::vec3(0.f);
+
+		//float height1 = glm::distance(nochange * glm::vec3(P1[0].position), nochange * glm::vec3(P1.back().position));
+		//float height2 = glm::distance(nochange * glm::vec3(P2[0].position), nochange * glm::vec3(P2.back().position));
+
+		//float newheight = glm::distance(nochange * axis[0].position, nochange * axis.back().position);
+	
+		//float scale1 = newheight / height1;
+		//float scale2 = newheight / height2;
+
+		//for (int i = 0; i < P1.size(); i++) {
+		//	P1[i].position = (scale1 * (P1[i].position - center1)) + newcenter;
+		//}
+		//for (int j = 0; j < P2.size(); j++) {
+		//	P2[j].position = (scale2 * (P2[j].position - center2)) + newcenter;
+		//}
+
+
+		//glm::vec3 toline = glm::abs(glm::normalize(current) - nochange);
+
+		for (auto i = P1.begin(); i < P1.end(); i++) {
+			glm::vec3 y = nochange * (*i).position;
+			glm::vec3 m = nochange * drawaxis;
+
+			float t = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+			(*i).position = ((glm::vec3(1.f) - fixed) * (*i).position) + (fixed * (axisstart + drawaxis * t));
+		}
+		for (auto j = P2.begin(); j < P2.end(); j++) {
+			glm::vec3 y = nochange * (*j).position;
+			glm::vec3 m = nochange * drawaxis;
+
+			float s = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+			(*j).position = ((glm::vec3(1.f) - fixed) * (*j).position) + (fixed * (axisstart + drawaxis * s));
 		}
 
-		// creating faces using vertex indices
-		for (int i = 1; i <= sweep.verts.size(); i++) {
-			for (int j = 0; j <= sprecision; j++) {
-				if (i != sweep.verts.size()) {
-					if (j != 0) {
-						indices.push_back((sweep.verts.size()) * j + i + 1);
-						indices.push_back((sweep.verts.size()) * (j - 1) + i + 1);
-						indices.push_back((sweep.verts.size()) * j + i - 1 + 1);
-					}
-					if (j != sprecision) {
-						indices.push_back((sweep.verts.size()) * j + i + 1);
-						indices.push_back((sweep.verts.size()) * j + i - 1 + 1);
-						indices.push_back((sweep.verts.size()) * (j + 1) + i - 1 + 1);
-					}
-				}
-				else {
-					if (j != 0) {
-						indices.push_back((sweep.verts.size()) * (j) + 0 + 1);
-						indices.push_back((sweep.verts.size()) * (j - 1) + 0 + 1);
-						indices.push_back((sweep.verts.size()) * (j) + sweep.verts.size() - 1 + 1);
-					}
-					if (j != sprecision) {
-						indices.push_back((sweep.verts.size()) * j + 0 + 1);
-						indices.push_back((sweep.verts.size()) * j + sweep.verts.size() - 1 + 1);
-						indices.push_back((sweep.verts.size()) * (j + 1) + sweep.verts.size() - 1 + 1);
-					}
-				}
-			}
-		}
+		pinch1.verts.clear();
+		pinch2.verts.clear();
+		pinch1 = Line(P1);
+		pinch2 = Line(P2);
 
-		for (int i = 1; i <= sweep.verts.size(); i++) {
-			indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 1));
-			indices.push_back(sweep.verts.size() * (sprecision + 1) + 1);
-			indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 2));
-			if (i == sweep.verts.size()) {
-				indices.push_back(sweep.verts.size() * (sprecision + 1) - 0);
-				indices.push_back(sweep.verts.size() * (sprecision + 1) + 1);
-				indices.push_back(sweep.verts.size() * (sprecision + 1) - (i - 1));
-			}
-		}
-
+		up = nochange;
 	}
 
 	void draw() {

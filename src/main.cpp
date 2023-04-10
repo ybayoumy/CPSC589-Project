@@ -530,11 +530,31 @@ int main()
 		}
 
 		// Line Drawing Logic. Max 2 lines can be drawn at a time. Only in DRAW_VIEW
-		if (view == DRAW_VIEW && cb->leftMouseDown)
+		if ( (view == DRAW_VIEW || view == PROFILE_VIEW) && cb->leftMouseDown)
 		{
-			float perspectiveMultiplier = glm::tan(glm::radians(22.5f)) * cam.radius;
-			glm::vec4 cursorPos = glm::vec4(cb->getCursorPosGL() * perspectiveMultiplier, -cam.radius, 1.0f);
-			cursorPos = glm::inverse(cam.getView()) * cursorPos;
+			glm::vec4 cursorPos;
+			if (view == DRAW_VIEW) {
+				cursorPos = cam.getCursorPos(cb->getCursorPosGL());
+			}
+			else if (view == PROFILE_VIEW) {
+				glm::vec3 fixed = meshes[selectedObjectIndex].fixed;
+				glm::vec3 nochange = fixed - glm::normalize(glm::abs(cam.getPos()));
+				glm::vec3 ref = fixed - nochange;
+				
+				glm::vec3 drawaxis = meshes[selectedObjectIndex].getAxis();
+				glm::vec3 axisstart = meshes[selectedObjectIndex].getPoint(nochange);
+
+				cursorPos = cam.getCursorPos(cb->getCursorPosGL());
+
+				glm::vec3 y = glm::vec4(nochange, 1.f) * cursorPos;
+				glm::vec3 m = nochange * drawaxis;
+
+				float t = (y.x + y.y + y.z) / (m.x + m.y + m.z);
+				float disttoaxis = glm::distance(ref * cam.getPos(), ref * (axisstart + drawaxis * t));
+
+				cursorPos = glm::vec4(cb->getCursorPosGL() * glm::tan(glm::radians(22.5f)) * disttoaxis, -disttoaxis, 1.0f);
+				cursorPos = glm::inverse(cam.getView()) * cursorPos;
+			}
 
 			if (lineInProgress)
 			{
@@ -708,7 +728,6 @@ int main()
 					meshInProgress->create(precision);
 					meshInProgress->setColor(lineColor);
 					meshInProgress->updateGPU();
-
 					meshInProgress = nullptr;
 				}
 			}
@@ -839,15 +858,87 @@ int main()
 				}
 			}
 		}
-		else if (view == PROFILE_VIEW || view == CROSS_VIEW) {
-			if (view == PROFILE_VIEW) {
-				std::string frameTitle = "Profile Modification - Object " + std::to_string(selectedObjectIndex);
-				ImGui::Begin(frameTitle.c_str());
+		else if (view == PROFILE_VIEW) {
+			std::string frameTitle = "Profile Modification - Object " + std::to_string(selectedObjectIndex);
+			ImGui::Begin(frameTitle.c_str());
+
+			ImGui::Text("");
+
+			if (cam.getPos() == meshes[selectedObjectIndex].cam.getPos()) {
+				ImGui::Text("Choose a Different Viewpoint to Edit Object Profile");
 			}
-			else if (view == CROSS_VIEW) {
-				std::string frameTitle = "Cross-Section Modification - Object " + std::to_string(selectedObjectIndex);
-				ImGui::Begin(frameTitle.c_str());
+
+			if (!(fabs(meshes[selectedObjectIndex].cam.phi - 0) < 0.01) || !(fabs(meshes[selectedObjectIndex].cam.theta - 0) < 0.01)) {
+				if (ImGui::Button("View XY Plane"))
+				{
+					if (lines.size() > 0) lines.clear();
+					cam.phi = 0.f;
+					cam.theta = 0.f;
+				}
 			}
+			if (!(fabs(meshes[selectedObjectIndex].cam.phi - 0) < 0.01) || !(fabs(meshes[selectedObjectIndex].cam.theta - M_PI_2) < 0.01)) {
+				if (ImGui::Button("View XZ Plane"))
+				{
+					if (lines.size() > 0) lines.clear();
+					cam.phi = 0.f;
+					cam.theta = M_PI_2 - 0.0001f;
+				}
+			}
+			if (!(fabs(meshes[selectedObjectIndex].cam.phi - M_PI_2) < 0.01) || !(fabs(meshes[selectedObjectIndex].cam.theta - 0) < 0.01)) {
+				if (ImGui::Button("View ZY Plane"))
+				{
+					if (lines.size() > 0) lines.clear();
+					cam.phi = M_PI_2;
+					cam.theta = 0.f;
+				}
+			}
+			if (lines.size() == 2 && meshes.size() != 0) {
+				if (ImGui::Button("Update Object Profile")) {
+					meshes[selectedObjectIndex].pinch1 = Line(modify_points.back().verts);
+					modify_points.pop_back();
+					meshes[selectedObjectIndex].pinch2 = Line(modify_points.back().verts);
+					modify_points.pop_back();
+					meshes[selectedObjectIndex].setPinch(precision, cam.getPos());
+					meshes[selectedObjectIndex].create(precision);
+					meshes[selectedObjectIndex].updateGPU();
+					modify_points.clear();
+					lines.clear();
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					boundInProgress->verts.push_back(Vertex{meshes[selectedObjectIndex].axis[0].position, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f)});
+					boundInProgress->verts.push_back(Vertex{meshes[selectedObjectIndex].axis.back().position, glm::vec3(1.f, 0.7f, 0.f), glm::vec3(0.f, 0.f, 0.f)});
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshes[selectedObjectIndex].pinch1).verts.begin(); i < (meshes[selectedObjectIndex].pinch1).verts.end(); i++) {
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					bounds.emplace_back();
+					boundInProgress = &bounds.back();
+					for (auto i = (meshes[selectedObjectIndex].pinch2).verts.begin(); i < (meshes[selectedObjectIndex].pinch2).verts.end(); i++) {
+						boundInProgress->verts.push_back(Vertex{ (*i).position, glm::vec3(1.f, 0.7f, 0.f), (*i).normal });
+					}
+					boundInProgress->updateGPU();
+					boundInProgress = nullptr;
+
+					view = OBJECT_VIEW;
+				}
+			}
+			if (ImGui::Button("Cancel")) {
+				if (modify_points.size() > 0) modify_points.clear();
+				if (lines.size() > 0) lines.clear();
+				view = OBJECT_VIEW;
+			}
+		}
+		else if (view == CROSS_VIEW) {
+			std::string frameTitle = "Cross-Section Modification - Object " + std::to_string(selectedObjectIndex);
+			ImGui::Begin(frameTitle.c_str());
 		}
 
 		if (ImGui::BeginPopupModal("ExportObjSuccessPopup"))

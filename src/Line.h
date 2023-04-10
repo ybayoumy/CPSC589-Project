@@ -9,20 +9,6 @@
 #include "Geometry.h"
 #include "ShaderProgram.h"
 
-glm::vec3 closestvec(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
-	glm::vec3 closest;
-	float min = 10.f;
-
-	for (auto i = points.begin(); i < points.end(); i++) {
-		float distance = glm::distance(ref * (*i).position, ref * point);
-		if (distance < min) {
-			closest = (*i).position;
-			min = distance;
-		}
-	}
-	return closest;
-}
-
 int closestindex(std::vector<Vertex> points, glm::vec3 point, glm::vec3 ref) {
 	int closest = -1;
 	float min = 10.f;
