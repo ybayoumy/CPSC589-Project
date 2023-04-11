@@ -446,7 +446,7 @@ int main()
 	ShaderProgram pickerShader("shaders/nolighting3D.vert", "shaders/picker.frag");
 
 	Camera cam(glm::radians(0.f), glm::radians(0.f), 3.0);
-	cam.fix();
+	cam.unFix();
 	auto cb = std::make_shared<Callbacks3D>(lightingShader, noLightingShader, pickerShader, cam, window.getWidth(), window.getHeight());
 
 	// CALLBACKS
@@ -480,8 +480,6 @@ int main()
 	bool showAxes = true;
 	bool simpleWireframe = false;
 	bool showbounds = false;
-	bool hide = false;
-	// bool sweep = false;
 
 	// Set the initial, default values of the shading uniforms.
 	lightingShader.use();
@@ -519,18 +517,6 @@ int main()
 	int precision = 150;
 
 	std::vector<int> ptmodify = std::vector{ -1,-1 };
-
-	// std::vector<Line> pinch;
-	// pinch.push_back(Line());
-	// pinch.push_back(Line());
-
-	// std::vector<Line> sweeps;
-
-	// std::vector<glm::vec3> views;
-	// std::vector<glm::vec3> ups;
-
-	// std::vector<glm::vec3> direction;
-	// bool XZ = false;
 
 	char ObjFilename[] = "";
 	std::string lastExportedFilename = "";
@@ -580,7 +566,7 @@ int main()
 		if ((view == DRAW_VIEW || view == PROFILE_DRAW || view == CROSS_DRAW) && cb->leftMouseDown)
 		{
 			glm::vec4 cursorPos;
-			// regular drawing mode (if user is drawing the object or user is making a cross section
+			// regular drawing mode (if user is drawing the object or user is making a cross section)
 			if (view == DRAW_VIEW || view == CROSS_DRAW) {
 				cursorPos = cam.getCursorPos(cb->getCursorPosGL());
 			}
