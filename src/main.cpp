@@ -586,12 +586,12 @@ int main()
 				lineInProgress->updateGPU();
 
 				if (view == CROSS_DRAW) {
-					if (cb->indexOfPointAtCursorPos(static_points[abs(1 - selectedCurveIndex)].verts, pointSize, cam) != -1) {
-						lineInProgress->verts.push_back(static_points[abs(1-selectedCurveIndex)].verts[selectedPointIndex]);
+					int newindex = cb->indexOfPointAtCursorPos(static_points[abs(1 - selectedCurveIndex)].verts, pointSize, cam);
+					if (newindex != -1) {
+						lineInProgress->verts.push_back(static_points[abs(1-selectedCurveIndex)].verts[newindex]);
 						selectedCurveIndex = -1;
 						selectedPointIndex = -1;
 						lineInProgress->updateGPU();
-
 						lineInProgress->ChaikinAlg(2);
 						modify_points.emplace_back(Line(lineInProgress->verts));
 
@@ -627,8 +627,8 @@ int main()
 						if (selectedPointIndex != -1) {
 							static_points[selectedCurveIndex].verts[selectedPointIndex].color = lineColor;
 							static_points[selectedCurveIndex].updateGPU();
-							static_points[abs(1 - selectedCurveIndex)].verts[selectedPointIndex].color = lineColor;
-							static_points[abs(1 - selectedCurveIndex)].updateGPU();
+							//static_points[abs(1 - selectedCurveIndex)].verts[selectedPointIndex].color = lineColor;
+							//static_points[abs(1 - selectedCurveIndex)].updateGPU();
 
 							// create a new line
 							lines.emplace_back(std::vector<Vertex>{static_points[selectedCurveIndex].verts[selectedPointIndex], Vertex{ cursorPos, lineColor, glm::vec3(0.0f) }});
@@ -641,16 +641,26 @@ int main()
 		}
 		else if (!(cb->leftMouseDown) && lineInProgress != nullptr)
 		{
-			lineInProgress->ChaikinAlg(2);
-			modify_points.emplace_back(Line(lineInProgress->verts));
+			if (view == CROSS_DRAW || lineInProgress->verts.size() < 4) {
+				static_points[0].setColor(black);
+				static_points[0].updateGPU();
+				static_points[1].setColor(black);
+				static_points[1].updateGPU();
+				selectedPointIndex = -1;
+				selectedCurveIndex = -1;
+				lines.pop_back();
+			}
+			else {
+				lineInProgress->ChaikinAlg(2);
+				modify_points.emplace_back(Line(lineInProgress->verts));
 
-			pointsInProgress = &modify_points.back();
-			pointsInProgress->setColor(black);
-			pointsInProgress->updateGPU();
+				pointsInProgress = &modify_points.back();
+				pointsInProgress->setColor(black);
+				pointsInProgress->updateGPU();
 
-			lineInProgress->BSpline(precision, lineColor);
-			lineInProgress->updateGPU();
-
+				lineInProgress->BSpline(precision, lineColor);
+				lineInProgress->updateGPU();
+			}
 			pointsInProgress = nullptr;
 			lineInProgress = nullptr;
 		}
@@ -658,11 +668,10 @@ int main()
 		if ((view == CURVE_VIEW || view == CROSS_EDIT || view == PROFILE_EDIT) && cb->leftMouseJustPressed()) {
 			selectedPointIndex = -1;
 			selectedCurveIndex = -1;
-			float threshold = pointSize;
 			if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT) {
 				for (int i = 0; i < modify_points.size(); i++) {
 					if (selectedPointIndex == -1) {
-						selectedPointIndex = cb->indexOfPointAtCursorPos(modify_points[i].verts, threshold, cam);
+						selectedPointIndex = cb->indexOfPointAtCursorPos(modify_points[i].verts, pointSize, cam);
 						selectedCurveIndex = i;
 					}
 				}
@@ -790,6 +799,8 @@ int main()
 				}
 				if (ImGui::Button("Clear Lines"))
 				{
+					static_points.clear();
+					modify_points.clear();
 					lines.clear();
 				}
 			}
@@ -887,7 +898,7 @@ int main()
 
 				pointsInProgress = &static_points.back();
 				pointsInProgress->setColor(black);
-				pointsInProgress->BSpline(20, black);
+				pointsInProgress->BSpline(40, black);
 				pointsInProgress->updateGPU();
 				pointsInProgress = nullptr;
 
@@ -903,13 +914,12 @@ int main()
 
 				pointsInProgress = &static_points.back();
 				pointsInProgress->setColor(black);
-				pointsInProgress->BSpline(20, black);
+				pointsInProgress->BSpline(40, black);
 				pointsInProgress->updateGPU();
 				pointsInProgress = nullptr;
 
 				stashedColor = lineColor;
 				lineColor = meshes[selectedObjectIndex].color;
-
 			}
 
 			ImGui::Text("");
@@ -917,11 +927,13 @@ int main()
 			{
 				meshes.erase(meshes.begin() + selectedObjectIndex);
 				view = FREE_VIEW;
+				change = true;
 				selectedObjectIndex = -1;
 			}
 			if (ImGui::Button("Cancel"))
 			{
 				view = FREE_VIEW;
+				change = true;
 				lineColor = stashedColor;
 				selectedObjectIndex = -1;
 			}
@@ -933,6 +945,7 @@ int main()
 				if (ImGui::Button("Accept Changes"))
 				{
 					view = DRAW_VIEW;
+					change = true;
 				}
 				if (ImGui::Button("Cancel")) {
 					lines.clear();
@@ -1228,7 +1241,7 @@ int main()
 		}
 
 		// Drawing Meshes (with Lighting)
-		if (view != CURVE_VIEW && view != PROFILE_EDIT && view != CROSS_EDIT && view != CROSS_DRAW) {
+		if (view == DRAW_VIEW || view == FREE_VIEW || view == OBJECT_VIEW) {
 			lightingShader.use();
 			cb->lightingViewPipeline();
 			for (int i = 0; i < meshes.size(); i++)
@@ -1249,14 +1262,28 @@ int main()
 				meshes[i].draw();
 			}
 		}
-
-		// Drawing Lines (no Lighting)
-		noLightingShader.use();
-		cb->noLightingViewPipeline();
-		for (Line &line : lines)
-		{
-			line.draw();
+		else if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT || view == CROSS_DRAW) {}
+		else {
+			lightingShader.use();
+			cb->lightingViewPipeline();
+			float a = ambientStrength;
+			float d = diffuseConstant;
+			d += 0.2f;
+			a += 0.05f;
+			cb->updateShadingUniforms(lightPos, d, a);
+			meshes[selectedObjectIndex].draw();
 		}
+
+		if (view == DRAW_VIEW || view == CURVE_VIEW || view == PROFILE_DRAW || view == PROFILE_EDIT || view == CROSS_DRAW || view == CROSS_EDIT) {
+			// Drawing Lines (no Lighting)
+			noLightingShader.use();
+			cb->noLightingViewPipeline();
+			for (Line& line : lines)
+			{
+				line.draw();
+			}
+		}
+
 		// Drawing Control Points (no Lighting)
 		if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_DRAW || view == CROSS_EDIT) {
 			noLightingShader.use();

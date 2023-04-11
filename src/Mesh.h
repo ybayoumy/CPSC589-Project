@@ -245,7 +245,9 @@ public:
 
 				for (int j = 0; j < sweep.verts.size(); j++) {
 					glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
-					glm::vec3 normal = glm::normalize(point - cvert);
+
+					glm::vec3 normal = glm::vec3(0.f);
+
 					verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
 				}
 			}
@@ -263,7 +265,33 @@ public:
 				glm::vec3 cvertprev = 0.5f * Spline1[i - 1].position + 0.5f * Spline2[i - 1].position;
 				verts.emplace_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::normalize(cvert - cvertprev)});
 			}
-		
+
+		}
+
+		glm::vec3 nextONring;
+		glm::vec3 nextring;
+		for (int i = 1; i < (verts.size()-1); i++) {
+			if (i % sweep.verts.size() == 0) {
+				if (i <= sweep.verts.size()) {
+					nextONring = verts[i - (sweep.verts.size() - 1)].position - verts[i].position;
+					nextring = verts[i + sweep.verts.size()].position - verts[i].position;
+				}
+				else {
+					nextONring = verts[i - 1].position - verts[i].position;
+					nextring = verts[i - sweep.verts.size()].position - verts[i].position;
+				}
+			}
+			else {
+				if (i <= sweep.verts.size()) {
+					nextONring = verts[i + 1].position - verts[i].position;
+					nextring = verts[i + sweep.verts.size()].position - verts[i].position;
+				}
+				else {
+					nextONring = verts[i - 1].position - verts[i].position;
+					nextring = verts[i - sweep.verts.size()].position - verts[i].position;
+				}
+			}
+			verts[i].normal = glm::cross(nextONring, nextring);
 		}
 
 		updateindices(indices, sweep.verts.size(), sprecision);
@@ -338,8 +366,8 @@ public:
 
 		}
 
-		output1.ChaikinAlg(2);
-		output2.ChaikinAlg(2);
+		output1.ChaikinAlg(4);
+		output2.ChaikinAlg(4);
 
 		output.emplace_back(Line(output1.verts));
 		output.emplace_back(Line(output2.verts));

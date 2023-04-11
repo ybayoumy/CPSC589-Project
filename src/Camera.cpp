@@ -49,6 +49,7 @@ glm::vec4 Camera::getCursorPos(glm::vec2 mouseIn) {
 }
 
 glm::vec4 Camera::getCursorPosOP(glm::vec2 mouseIn, glm::vec3 fixed, glm::vec3 nochange, glm::vec3 drawaxis, glm::vec3 axisstart) {
+	
 	glm::vec3 ref = fixed - nochange;
 
 	glm::vec4 cursorPos = getCursorPos(mouseIn);
