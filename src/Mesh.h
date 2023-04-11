@@ -379,7 +379,7 @@ public:
 		Line temp;
 		temp = Line(cross);
 		temp.getCrossSection(cam, fixed);
-		cam.standardize(temp.verts);
+		//cam.standardize(temp.verts);
 
 		crosssection = temp.verts;
 		temp.BSpline(precision, color);
