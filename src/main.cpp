@@ -327,16 +327,28 @@ std::vector<Line> generateAxisLines()
 	Vertex zNegative{glm::vec3(0.0f, 0.0f, -50.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f)};
 	axisLines.emplace_back(std::vector<Vertex>{zNegative, zPositive});
 
-	Vertex m2Positive{ glm::vec3(0.0f, 50.0f, .5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
-	Vertex m2Negative{ glm::vec3(0.0f, -50.0f, .5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
-	axisLines.emplace_back(std::vector<Vertex>{m2Negative, m2Positive});
-
-	Vertex p2Positive{ glm::vec3(0.0f, 50.0f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
-	Vertex p2Negative{ glm::vec3(0.0f, -50.0f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
-	axisLines.emplace_back(std::vector<Vertex>{p2Negative, p2Positive});
-
 	return axisLines;
 }
+
+void drawInteractiveCurve(std::vector<Line> &lines, std::vector<Line> &points, Line controlpoints, glm::vec3 lineColor, glm::vec3 pointColor, int precision) {
+	Line* lineInProgress = nullptr;
+	Line* pointsInProgress = nullptr;
+
+	lines.emplace_back(Line(controlpoints.verts));
+	points.emplace_back(Line(controlpoints.verts));
+
+	lineInProgress = &lines.back();
+	lineInProgress->setColor(lineColor);
+	lineInProgress->BSpline(precision, lineColor);
+	lineInProgress->updateGPU();
+	lineInProgress = nullptr;
+
+	pointsInProgress = &points.back();
+	pointsInProgress->setColor(glm::vec3(pointColor));
+	pointsInProgress->updateGPU();
+	pointsInProgress = nullptr;
+}
+
 
 // return true if export was successful, false otherwise
 bool exportToObj(std::string filename, std::vector<Mesh> &meshes)
@@ -596,15 +608,6 @@ int main()
 			if (view == DRAW_VIEW || view == CROSS_DRAW || view == PROFILE_DRAW) {
 				cursorPos = cam.getCursorPos(cb->getCursorPosGL());
 			}
-			// alternate drawing mode if user is drawing on the axis (may change)
-			/*else if (view == PROFILE_DRAW) {
-				glm::vec3 fixed = meshes[selectedObjectIndex].fixed;
-				glm::vec3 nochange = fixed - glm::normalize(glm::abs(cam.getPos()));
-				glm::vec3 drawaxis = meshes[selectedObjectIndex].getAxis();
-				glm::vec3 axisstart = meshes[selectedObjectIndex].getPoint(nochange);
-
-				cursorPos = cam.getCursorPosOP(cb->getCursorPosGL(), fixed, nochange, drawaxis, axisstart);
-			}*/
 
 			if (lineInProgress)
 			{
@@ -733,23 +736,10 @@ int main()
 				modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
 				modify_points[selectedCurveIndex].updateGPU();
 
-				lines[selectedCurveIndex+2].verts = modify_points[selectedCurveIndex].verts;
-				lines[selectedCurveIndex+2].BSpline(precision, lines[selectedCurveIndex].col);
-				lines[selectedCurveIndex+2].updateGPU();
+				lines[selectedCurveIndex + 2].verts = modify_points[selectedCurveIndex].verts;
+				lines[selectedCurveIndex + 2].BSpline(precision, lines[selectedCurveIndex].col);
+				lines[selectedCurveIndex + 2].updateGPU();
 			}
-			/*else if (view == PROFILE_EDIT) {
-				glm::vec3 fixed = meshes[selectedObjectIndex].fixed;
-				glm::vec3 nochange = fixed - glm::normalize(glm::abs(cam.getPos()));
-				glm::vec3 drawaxis = meshes[selectedObjectIndex].getAxis();
-				glm::vec3 axisstart = meshes[selectedObjectIndex].getPoint(nochange);
-
-				modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPosOP(cb->getCursorPosGL(), fixed, nochange, drawaxis, axisstart);
-				modify_points[selectedCurveIndex].updateGPU();
-
-				lines[selectedCurveIndex].verts = modify_points[selectedCurveIndex].verts;
-				lines[selectedCurveIndex].BSpline(precision, lines[selectedCurveIndex].col);
-				lines[selectedCurveIndex].updateGPU();
-			}*/
 			pointsInProgress = nullptr;
 			lineInProgress = nullptr;
 		}
@@ -896,35 +886,8 @@ int main()
 				lines.clear();
 				modify_points.clear();
 
-				// pulls control points from mesh, gets BSpline
-				lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts1.verts));
-				lineInProgress = &lines.back();
-
-				modify_points.emplace_back(Line(lineInProgress->verts));
-				lineInProgress->setColor(meshes[selectedObjectIndex].color);
-				lineInProgress->BSpline(precision, lineInProgress->col);
-				lineInProgress->updateGPU();
-				lineInProgress = nullptr;
-
-				pointsInProgress = &modify_points.back();
-				pointsInProgress->setColor(black);
-				pointsInProgress->updateGPU();
-				pointsInProgress = nullptr;
-
-				lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts2.verts));
-				lineInProgress = &lines.back();
-
-				modify_points.emplace_back(Line(lineInProgress->verts));
-
-				lineInProgress->setColor(meshes[selectedObjectIndex].color);
-				lineInProgress->BSpline(precision, lineInProgress->col);
-				lineInProgress->updateGPU();
-				lineInProgress = nullptr;
-
-				pointsInProgress = &modify_points.back();
-				pointsInProgress->setColor(black);
-				pointsInProgress->updateGPU();
-				pointsInProgress = nullptr;
+				drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].ctrlpts1.verts), meshes[selectedObjectIndex].color, black, precision);
+				drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].ctrlpts2.verts), meshes[selectedObjectIndex].color, black, precision);
 			}
 			// modify the profile curves of the object
 			if (ImGui::Button("Modify Object Profile")) {
@@ -934,8 +897,9 @@ int main()
 				tempmesh.indices.clear();
 
 				profiletheta = glm::orientedAngle(meshes[selectedObjectIndex].cam.getUp(), meshes[selectedObjectIndex].getAxis(), -meshes[selectedObjectIndex].cam.getPos());
-
 				tempmesh = meshes[selectedObjectIndex].gettempmesh(profiletheta);
+				tempmesh.create(precision);
+				tempmesh.updateGPU();
 
 				if (fabs(cam.phi - 0.f) < 0.1f && fabs(cam.theta - 0.f) < 0.1f) {
 					oldcam = cam;
@@ -954,10 +918,8 @@ int main()
 					cam.phi = M_PI_2;
 					cam.theta = 0.f;
 				}
-			
-				tempmesh.create(precision);
-				tempmesh.updateGPU();
 
+				cam.fix();
 			}
 			// modify cross section
 			if (ImGui::Button("Modify Object Cross-Section")) {
@@ -1088,89 +1050,43 @@ int main()
 			ImGui::Text("");
 
 			if (view == PROFILE_VIEW) {
-				//if (cam.getPos() == meshes[selectedObjectIndex].cam.getPos()) {
-				//	ImGui::Text("Choose a Different Viewpoint to Edit Object Profile");
-				//}
-				//else {
-					if (ImGui::Button("Draw New Object Profile")) {
-						view = PROFILE_DRAW;
+				if (ImGui::Button("Draw New Object Profile")) {
+					view = PROFILE_DRAW;
+				}
+				if (ImGui::Button("Edit Existing Object Profile")) {
+					view = PROFILE_EDIT;
+					if (meshes[selectedObjectIndex].pinch1.verts.size() > 0 && meshes[selectedObjectIndex].pinch2.verts.size() > 0) {
+						lines.clear();
+						modify_points.clear();
+						
+						drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].pinch1.verts), meshes[selectedObjectIndex].color, black, precision);
+						drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].pinch2.verts), meshes[selectedObjectIndex].color, black, precision);
 					}
-					if (ImGui::Button("Edit Existing Object Profile")) {
-						view = PROFILE_EDIT;
-						if (meshes[selectedObjectIndex].pinch1.verts.size() > 0 && meshes[selectedObjectIndex].pinch2.verts.size() > 0) {
-							lines.clear();
-							modify_points.clear();
+					else {
+						lines.clear();
+						modify_points.clear();
 
-							lines.emplace_back(Line(meshes[selectedObjectIndex].pinch1.verts));
-							lineInProgress = &lines.back();
+						std::vector<Line> pinches = tempmesh.getPinches(precision);
 
-							modify_points.emplace_back(Line(lineInProgress->verts));
+						drawInteractiveCurve(lines, modify_points, Line(pinches[0].verts), meshes[selectedObjectIndex].color, black, precision);
+						drawInteractiveCurve(lines, modify_points, Line(pinches[1].verts), meshes[selectedObjectIndex].color, black, precision);
 
-							lineInProgress->setColor(meshes[selectedObjectIndex].color);
-							lineInProgress->BSpline(precision, lineInProgress->col);
-							lineInProgress->updateGPU();
-							lineInProgress = nullptr;
-
-							pointsInProgress = &modify_points.back();
-							pointsInProgress->setColor(black);
-							pointsInProgress->updateGPU();
-							pointsInProgress = nullptr;
-
-							lines.emplace_back(Line(meshes[selectedObjectIndex].pinch2.verts));
-							lineInProgress = &lines.back();
-
-							modify_points.emplace_back(Line(lineInProgress->verts));
-
-							lineInProgress->setColor(meshes[selectedObjectIndex].color);
-							lineInProgress->BSpline(precision, lineInProgress->col);
-							lineInProgress->updateGPU();
-							lineInProgress = nullptr;
-
-							pointsInProgress = &modify_points.back();
-							pointsInProgress->setColor(black);
-							pointsInProgress->updateGPU();
-							pointsInProgress = nullptr;
-						}
-						else {
-							lines.clear();
-							modify_points.clear();
-
-							std::vector<Line> pinches = meshes[selectedObjectIndex].getPinches(precision);
-
-							lines.emplace_back(Line(pinches[0].verts));
-							lineInProgress = &lines.back();
-
-							modify_points.emplace_back(Line(lineInProgress->verts));
-
-							lineInProgress->setColor(meshes[selectedObjectIndex].color);
-							lineInProgress->BSpline(precision, lineInProgress->col);
-							lineInProgress->updateGPU();
-							lineInProgress = nullptr;
-
-							pointsInProgress = &modify_points.back();
-							pointsInProgress->setColor(black);
-							pointsInProgress->updateGPU();
-							pointsInProgress = nullptr;
-
-							lines.emplace_back(Line(pinches[1].verts));
-							lineInProgress = &lines.back();
-
-							modify_points.emplace_back(Line(lineInProgress->verts));
-
-							lineInProgress->setColor(meshes[selectedObjectIndex].color);
-							lineInProgress->BSpline(precision, lineInProgress->col);
-							lineInProgress->updateGPU();
-							lineInProgress = nullptr;
-
-							pointsInProgress = &modify_points.back();
-							pointsInProgress->setColor(black);
-							pointsInProgress->updateGPU();
-							pointsInProgress = nullptr;
-
-							pinches.clear();
-						}
+						pinches.clear();
 					}
+				}
 				if (ImGui::Button("Cancel")) {
+					meshes[selectedObjectIndex].verts.clear();
+					for (auto j = tempmesh.verts.begin(); j < tempmesh.verts.end(); j++) {
+						(*j).position = glm::translate(glm::mat4(1.f), meshes[selectedObjectIndex].getCenter()) * glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).position, 1.f);
+						(*j).normal = glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).normal, 0.f);
+						meshes[selectedObjectIndex].verts.push_back((*j));
+					}
+					meshes[selectedObjectIndex].updateGPU();
+
+					cam = oldcam;
+
+					tempmesh.verts.clear();
+					tempmesh.updateGPU();
 					modify_points.clear();
 					lines.clear();
 					view = OBJECT_VIEW;
@@ -1189,30 +1105,19 @@ int main()
 				}
 				if (lines.size() == 2 && meshes.size() != 0) {
 					if (ImGui::Button("Accept Changes")) {
+						meshes[selectedObjectIndex].pinch1 = Line(modify_points.back().verts);
 						tempmesh.pinch1 = Line(modify_points.back().verts);
 						modify_points.pop_back();
+						meshes[selectedObjectIndex].pinch2 = Line(modify_points.back().verts);
 						tempmesh.pinch2 = Line(modify_points.back().verts);
 						modify_points.pop_back();
 						tempmesh.create(precision);
 						tempmesh.updateGPU();
 
-						meshes[selectedObjectIndex].verts.clear();
-
-						for (auto j = tempmesh.verts.begin(); j < tempmesh.verts.end(); j++) {
-							(*j).position = glm::translate(glm::mat4(1.f), meshes[selectedObjectIndex].getCenter()) * glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).position, 1.f);
-							(*j).normal = glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).position, 0.f);
-							meshes[selectedObjectIndex].verts.push_back((*j));
-						}
-						meshes[selectedObjectIndex].updateGPU();
-
-						tempmesh.verts.clear();
-						tempmesh.updateGPU();
 						modify_points.clear();
 						lines.clear();
 
-						cam = oldcam;
-
-						view = OBJECT_VIEW;
+						view = PROFILE_VIEW;
 					}
 				}
 				if (ImGui::Button("Cancel")) {
@@ -1355,7 +1260,17 @@ int main()
 				meshes[i].draw();
 			}
 		}
-		else if (view == CURVE_VIEW || view == PROFILE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT || view == CROSS_DRAW || view == PROFILE_DRAW) {}
+		else if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT || view == CROSS_DRAW) {}
+		else if (view == PROFILE_VIEW || view == PROFILE_DRAW) {
+			lightingShader.use();
+			cb->lightingViewPipeline();
+			float a = ambientStrength;
+			float d = diffuseConstant;
+			d += 0.2f;
+			a += 0.05f;
+			cb->updateShadingUniforms(lightPos, d, a);
+			tempmesh.draw();
+		}
 		else {
 			lightingShader.use();
 			cb->lightingViewPipeline();
@@ -1366,16 +1281,6 @@ int main()
 			cb->updateShadingUniforms(lightPos, d, a);
 			meshes[selectedObjectIndex].draw();
 		}
-
-		lightingShader.use();
-		cb->lightingViewPipeline();
-		float a = ambientStrength;
-		float d = diffuseConstant;
-		d += 0.2f;
-		a += 0.05f;
-		cb->updateShadingUniforms(lightPos, d, a);
-		tempmesh.draw();
-
 
 		if (view == DRAW_VIEW || view == CURVE_VIEW || view == PROFILE_DRAW || view == PROFILE_EDIT || view == CROSS_DRAW || view == CROSS_EDIT) {
 			// Drawing Lines (no Lighting)
