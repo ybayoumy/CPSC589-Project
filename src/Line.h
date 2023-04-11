@@ -197,11 +197,11 @@ public:
 		std::vector<Vertex> temp = verts;
 		verts.clear();
 		for (int i = 0; i < temp.size() - 1; i++) {
-			glm::vec3 newp = (R1 * T1 * glm::vec4(temp[i].position, 1.f));
+			glm::vec3 newp = (S1 * R1 * T1 * glm::vec4(temp[i].position, 1.f));
 			verts.push_back(Vertex{ newp, col, glm::vec3(0.f, 0.f, 0.f) });
 		}
 		for (int j = temp.size() - 1; j > 0; j--) {
-			glm::vec3 newp2 = (R2 * R1 * T1 * glm::vec4(temp[j].position, 1.f));
+			glm::vec3 newp2 = (S2 * S1 * R1 * T1 * glm::vec4(temp[j].position, 1.f));
 			verts.push_back(Vertex{ newp2, col, glm::vec3(0.f, 0.f, 0.f) });
 		}
 	}

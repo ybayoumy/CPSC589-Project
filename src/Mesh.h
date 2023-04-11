@@ -136,12 +136,12 @@ public:
 	std::vector<Vertex> axis;
 	std::vector<std::vector<Vertex>> discs;
 
+	float height;
+	float width;
+
 	glm::vec3 color;
 
 	Line crosssection;
-
-	Line bound1;
-	Line bound2;
 	Line sweep;
 
 	Line ctrlpts1;
@@ -178,14 +178,53 @@ public:
 		return disc;
 	}
 
+
+	glm::vec3 getAxis() {
+		glm::vec3 avgaxis = axis.back().position - axis[0].position;
+		return glm::normalize(avgaxis);
+	}
+
+	glm::vec3 getCenter() {
+		glm::vec3 center = 0.5f * axis.back().position + 0.5f * axis[0].position;
+		return center;
+	}
+
+	glm::vec3 getPoint(glm::vec3 fix) {
+		glm::vec3 y = fix * axis[0].position;
+		glm::vec3 m = fix * getAxis();
+
+		float t = (-(y.x + y.y + y.z)) / (m.x + m.y + m.z);
+		glm::vec3 point = getAxis() * t + axis[0].position;
+		return point;
+	}
+
+	Mesh gettempmesh(float profiletheta) {
+		Mesh tempmesh;
+		tempmesh.ctrlpts1 = Line(ctrlpts1.verts);
+		tempmesh.ctrlpts2 = Line(ctrlpts2.verts);
+		tempmesh.sweep = Line(sweep.verts);
+		tempmesh.cam = cam;
+		tempmesh.color = color;
+
+		for (auto j = tempmesh.ctrlpts1.verts.begin(); j < tempmesh.ctrlpts1.verts.end(); j++) {
+			(*j).position = glm::rotate(glm::mat4(1.f), -profiletheta, -cam.getPos()) * glm::translate(glm::mat4(1.f), -getCenter()) * glm::vec4((*j).position, 1.f);
+		}
+
+		for (auto i = tempmesh.ctrlpts2.verts.begin(); i < tempmesh.ctrlpts2.verts.end(); i++) {
+			(*i).position = glm::rotate(glm::mat4(1.f), -profiletheta, -cam.getPos()) * glm::translate(glm::mat4(1.f), -getCenter()) * glm::vec4((*i).position, 1.f);
+		}
+
+		return tempmesh;
+	}
+
 	void create(int sprecision) {
 		discs.clear();
 		verts.clear();
 		indices.clear();
 		axis.clear();
 
-		bound1 = Line(ctrlpts1.verts);
-		bound2 = Line(ctrlpts2.verts);
+		Line bound1 = Line(ctrlpts1.verts);
+		Line bound2 = Line(ctrlpts2.verts);
 
 		bound1.BSpline(sprecision, glm::vec3(0.f));
 		bound2.BSpline(sprecision, glm::vec3(0.f));
@@ -200,20 +239,22 @@ public:
 		temppinch2 = Line(pinch2.verts);
 
 		if (temppinch1.verts.size() > 0 && temppinch2.verts.size() > 0) {
-			temppinch1.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
-			temppinch2.BSpline(sprecision, glm::vec3(0.f, 0.f, 0.f));
+			temppinch1.BSpline(2 * sprecision, glm::vec3(0.f, 0.f, 0.f));
+			temppinch2.BSpline(2 * sprecision, glm::vec3(0.f, 0.f, 0.f));
 		}
 
 		glm::vec3 cvert = glm::vec3(0.f);
 		glm::vec3 diameter = glm::vec3(0.f);
+		glm::vec3 pdiameter = glm::vec3(0.f);
+
+		float pscale;
 		float scale;
 		float theta;
 
-		fixed = glm::vec3(1.f) - glm::normalize(glm::abs(cam.getPos()));
-		unfixed = glm::normalize(glm::vec3(cam.getPos().x, cam.getPos().y, -cam.getPos().z));
+		height = glm::distance(sweep.verts[0].position,sweep.verts[floor(sweep.verts.size() / 2)].position);
+		width = glm::distance(sweep.verts[floor(1 * sweep.verts.size() / 4)].position, sweep.verts[floor(3 * sweep.verts.size() / 4)].position);
 
 		orderlines(Spline1, Spline2);
-
 		std::vector<Vertex> disc;
 
 		for (int i = 0; i <= sprecision; i++) {
@@ -227,19 +268,21 @@ public:
 			}
 
 			diameter = (Spline1[i].position - Spline2[i].position);
-			scale = 0.5 * glm::length(diameter);
+			scale = (1.f / height) * glm::length(diameter);
 			theta = glm::orientedAngle(glm::normalize(cam.getUp()), glm::normalize(diameter), -glm::normalize(cam.getPos()));
 
 			if (temppinch1.verts.size() > 0 && temppinch2.verts.size() > 0) {
-				glm::vec3 P1 = closestvec(temppinch1.verts, cvert, up);
-				glm::vec3 P2 = closestvec(temppinch2.verts, cvert, up);
-				glm::vec3 pdiameter = P2 - P1;
+				glm::vec3 P1 = closestvec(temppinch1.verts, cvert, cam.getUp());
+				glm::vec3 P2 = closestvec(temppinch2.verts, cvert, cam.getUp());
 
-				cvert = (cvert * fixed) + ((0.5f * (P1 + P2)) * glm::abs(unfixed));
+				pdiameter = P2 - P1;
 
-				float pscale = 0.5 * glm::length(pdiameter);
-				glm::vec3 scaleby = pscale * unfixed + scale * fixed;
+				cvert = cvert * (glm::vec3(1.f) - glm::abs(glm::normalize(cam.getPos()))) + (0.5f * (P1 + P2) * glm::abs(glm::normalize(cam.getPos())));
 
+				pscale = (1.f / width) * glm::length(pdiameter);
+
+				glm::vec3 scaleby = pscale * glm::abs(glm::normalize(cam.getPos())) + scale * (glm::vec3(1.f) - glm::abs(glm::normalize(cam.getPos())));
+			
 				glm::mat4 S = glm::scale(glm::mat4(1.f), scaleby);
 				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, -cam.getPos());
 				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
@@ -274,6 +317,8 @@ public:
 
 		}
 
+		// NORMALS CALCULATION
+
 		glm::vec3 nextONring;
 		glm::vec3 nextring;
 		for (int i = 1; i < (verts.size()-1); i++) {
@@ -304,58 +349,6 @@ public:
 
 		temppinch1.verts.clear();
 		temppinch2.verts.clear();
-	}
-
-	glm::vec3 getAxis() {
-		glm::vec3 avgaxis = axis.back().position - axis[0].position;
-		return glm::normalize(avgaxis);
-	}
-
-	glm::vec3 getPoint(glm::vec3 fix) {
-		glm::vec3 y = fix * axis[0].position;
-		glm::vec3 m = fix * getAxis();
-
-		float t = (-(y.x + y.y + y.z)) / (m.x + m.y + m.z);
-		glm::vec3 point = getAxis() * t + axis[0].position;
-		return point;
-	}
-
-	void setPinch(glm::vec3 current) {
-		
-		std::vector<Vertex> P1 = pinch1.verts;
-		std::vector<Vertex> P2 = pinch2.verts;
-
-		glm::vec3 nochange = fixed - glm::normalize(glm::abs(current));
-		glm::vec3 drawaxis = getAxis();
-		glm::vec3 axisstart = getPoint(nochange);
-
-		orderlines(P1, P2);
-
-		glm::vec3 center1 = 0.5f * (P1[0].position + P1.back().position);
-		glm::vec3 center2 = 0.5f * (P2[0].position + P2.back().position);
-		glm::vec3 newcenter = 0.5f * (axis[0].position + axis.back().position);
-
-		for (auto i = P1.begin(); i < P1.end(); i++) {
-			glm::vec3 y = nochange * (*i).position;
-			glm::vec3 m = nochange * drawaxis;
-
-			float t = (y.x + y.y + y.z) / (m.x + m.y + m.z);
-			(*i).position = ((glm::vec3(1.f) - fixed) * (*i).position) + (fixed * (axisstart + drawaxis * t));
-		}
-		for (auto j = P2.begin(); j < P2.end(); j++) {
-			glm::vec3 y = nochange * (*j).position;
-			glm::vec3 m = nochange * drawaxis;
-
-			float s = (y.x + y.y + y.z) / (m.x + m.y + m.z);
-			(*j).position = ((glm::vec3(1.f) - fixed) * (*j).position) + (fixed * (axisstart + drawaxis * s));
-		}
-
-		pinch1.verts.clear();
-		pinch2.verts.clear();
-		pinch1 = Line(P1);
-		pinch2 = Line(P2);
-
-		up = nochange;
 	}
 
 	std::vector<Line> getPinches(int sprecision) {
@@ -422,9 +415,9 @@ public:
 		, color(glm::vec3(0.f, 0.f, 0.f))
 		, ctrlpts1()
 		, ctrlpts2()
-		, bound1()
-		, bound2()
 		, sweep()
+		, width(2.f)
+		, height(2.f)
 		//, pinch1()
 		//, pinch2()
 		, cam(c)
@@ -436,9 +429,9 @@ public:
 		, color(glm::vec3(0.f, 0.f, 0.f))
 		, ctrlpts1()
 		, ctrlpts2()
-		, bound1()
-		, bound2()
 		, sweep()
+		, width(2.f)
+		, height(2.f)
 		//, pinch1()
 		//, pinch2()
 		, cam(0, 0, 1)

@@ -327,6 +327,14 @@ std::vector<Line> generateAxisLines()
 	Vertex zNegative{glm::vec3(0.0f, 0.0f, -50.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f)};
 	axisLines.emplace_back(std::vector<Vertex>{zNegative, zPositive});
 
+	Vertex m2Positive{ glm::vec3(0.0f, 50.0f, .5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	Vertex m2Negative{ glm::vec3(0.0f, -50.0f, .5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{m2Negative, m2Positive});
+
+	Vertex p2Positive{ glm::vec3(0.0f, 50.0f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	Vertex p2Negative{ glm::vec3(0.0f, -50.0f, -0.5f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f) };
+	axisLines.emplace_back(std::vector<Vertex>{p2Negative, p2Positive});
+
 	return axisLines;
 }
 
@@ -496,6 +504,10 @@ int main()
 	std::vector<Mesh> meshes;
 	Mesh* meshInProgress = nullptr;
 
+	Mesh tempmesh;
+	float profiletheta;
+	Camera oldcam(cam);
+
 	glm::vec3 lineColor{ 0.0f, 1.0f, 0.7f };
 	glm::vec3 stashedColor{ 0.f, 1.f, 0.7f };
 	std::vector<Line> lines;
@@ -581,18 +593,18 @@ int main()
 		{
 			glm::vec4 cursorPos;
 			// regular drawing mode (if user is drawing the object or user is making a cross section
-			if (view == DRAW_VIEW || view == CROSS_DRAW) {
+			if (view == DRAW_VIEW || view == CROSS_DRAW || view == PROFILE_DRAW) {
 				cursorPos = cam.getCursorPos(cb->getCursorPosGL());
 			}
 			// alternate drawing mode if user is drawing on the axis (may change)
-			else if (view == PROFILE_DRAW) {
+			/*else if (view == PROFILE_DRAW) {
 				glm::vec3 fixed = meshes[selectedObjectIndex].fixed;
 				glm::vec3 nochange = fixed - glm::normalize(glm::abs(cam.getPos()));
 				glm::vec3 drawaxis = meshes[selectedObjectIndex].getAxis();
 				glm::vec3 axisstart = meshes[selectedObjectIndex].getPoint(nochange);
 
 				cursorPos = cam.getCursorPosOP(cb->getCursorPosGL(), fixed, nochange, drawaxis, axisstart);
-			}
+			}*/
 
 			if (lineInProgress)
 			{
@@ -917,6 +929,35 @@ int main()
 			// modify the profile curves of the object
 			if (ImGui::Button("Modify Object Profile")) {
 				view = PROFILE_VIEW;
+			
+				tempmesh.verts.clear();
+				tempmesh.indices.clear();
+
+				profiletheta = glm::orientedAngle(meshes[selectedObjectIndex].cam.getUp(), meshes[selectedObjectIndex].getAxis(), -meshes[selectedObjectIndex].cam.getPos());
+
+				tempmesh = meshes[selectedObjectIndex].gettempmesh(profiletheta);
+
+				if (fabs(cam.phi - 0.f) < 0.1f && fabs(cam.theta - 0.f) < 0.1f) {
+					oldcam = cam;
+					cam.phi = M_PI_2;
+					cam.theta = 0.f;
+				}
+
+				else if (fabs(cam.phi - M_PI_2) < 0.1f && fabs(cam.theta - 0.f) < 0.1f) {
+					oldcam = cam;
+					cam.phi = 0.f;
+					cam.theta = 0.f;
+				}
+
+				else if (fabs(cam.phi - 0.f) < 0.1f && fabs(cam.theta - (M_PI_2 - 0.0001f)) < 0.1f){
+					oldcam = cam;
+					cam.phi = M_PI_2;
+					cam.theta = 0.f;
+				}
+			
+				tempmesh.create(precision);
+				tempmesh.updateGPU();
+
 			}
 			// modify cross section
 			if (ImGui::Button("Modify Object Cross-Section")) {
@@ -1047,10 +1088,10 @@ int main()
 			ImGui::Text("");
 
 			if (view == PROFILE_VIEW) {
-				if (cam.getPos() == meshes[selectedObjectIndex].cam.getPos()) {
-					ImGui::Text("Choose a Different Viewpoint to Edit Object Profile");
-				}
-				else {
+				//if (cam.getPos() == meshes[selectedObjectIndex].cam.getPos()) {
+				//	ImGui::Text("Choose a Different Viewpoint to Edit Object Profile");
+				//}
+				//else {
 					if (ImGui::Button("Draw New Object Profile")) {
 						view = PROFILE_DRAW;
 					}
@@ -1129,33 +1170,6 @@ int main()
 							pinches.clear();
 						}
 					}
-				}
-
-				if (!(fabs(meshes[selectedObjectIndex].cam.phi - 0) < 0.01) || !(fabs(meshes[selectedObjectIndex].cam.theta - 0) < 0.01)) {
-					if (ImGui::Button("View XY Plane"))
-					{
-						if (lines.size() > 0) lines.clear();
-						cam.phi = 0.f;
-						cam.theta = 0.f;
-					}
-				}
-				if (!(fabs(meshes[selectedObjectIndex].cam.phi - 0) < 0.01) || !(fabs(meshes[selectedObjectIndex].cam.theta - M_PI_2) < 0.01)) {
-					if (ImGui::Button("View XZ Plane"))
-					{
-						if (lines.size() > 0) lines.clear();
-						cam.phi = 0.f;
-						cam.theta = M_PI_2 - 0.0001f;
-					}
-				}
-				if (!(fabs(meshes[selectedObjectIndex].cam.phi - M_PI_2) < 0.01) || !(fabs(meshes[selectedObjectIndex].cam.theta - 0) < 0.01)) {
-					if (ImGui::Button("View ZY Plane"))
-					{
-						if (lines.size() > 0) lines.clear();
-						cam.phi = M_PI_2;
-						cam.theta = 0.f;
-					}
-				}
-
 				if (ImGui::Button("Cancel")) {
 					modify_points.clear();
 					lines.clear();
@@ -1164,18 +1178,41 @@ int main()
 			}
 
 			else if (view == PROFILE_DRAW || view == PROFILE_EDIT) {
+				ImGui::Text("");
+				std::string linesDrawn = "Lines Drawn: " + std::to_string(lines.size()) + "/" + std::to_string(2);
+				if (view == PROFILE_DRAW) {
+					if (lines.size() == 2)
+						ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
+					ImGui::Text(linesDrawn.c_str());
+					if (lines.size() == 2)
+						ImGui::PopStyleColor();
+				}
 				if (lines.size() == 2 && meshes.size() != 0) {
 					if (ImGui::Button("Accept Changes")) {
-						meshes[selectedObjectIndex].pinch1 = Line(modify_points.back().verts);
+						tempmesh.pinch1 = Line(modify_points.back().verts);
 						modify_points.pop_back();
-						meshes[selectedObjectIndex].pinch2 = Line(modify_points.back().verts);
+						tempmesh.pinch2 = Line(modify_points.back().verts);
 						modify_points.pop_back();
-						meshes[selectedObjectIndex].setPinch(cam.getPos());
-						meshes[selectedObjectIndex].create(precision);
+						tempmesh.create(precision);
+						tempmesh.updateGPU();
+
+						meshes[selectedObjectIndex].verts.clear();
+
+						for (auto j = tempmesh.verts.begin(); j < tempmesh.verts.end(); j++) {
+							(*j).position = glm::translate(glm::mat4(1.f), meshes[selectedObjectIndex].getCenter()) * glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).position, 1.f);
+							(*j).normal = glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).position, 0.f);
+							meshes[selectedObjectIndex].verts.push_back((*j));
+						}
 						meshes[selectedObjectIndex].updateGPU();
+
+						tempmesh.verts.clear();
+						tempmesh.updateGPU();
 						modify_points.clear();
 						lines.clear();
-						view = PROFILE_VIEW;
+
+						cam = oldcam;
+
+						view = OBJECT_VIEW;
 					}
 				}
 				if (ImGui::Button("Cancel")) {
@@ -1318,7 +1355,7 @@ int main()
 				meshes[i].draw();
 			}
 		}
-		else if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT || view == CROSS_DRAW) {}
+		else if (view == CURVE_VIEW || view == PROFILE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT || view == CROSS_DRAW || view == PROFILE_DRAW) {}
 		else {
 			lightingShader.use();
 			cb->lightingViewPipeline();
@@ -1329,6 +1366,16 @@ int main()
 			cb->updateShadingUniforms(lightPos, d, a);
 			meshes[selectedObjectIndex].draw();
 		}
+
+		lightingShader.use();
+		cb->lightingViewPipeline();
+		float a = ambientStrength;
+		float d = diffuseConstant;
+		d += 0.2f;
+		a += 0.05f;
+		cb->updateShadingUniforms(lightPos, d, a);
+		tempmesh.draw();
+
 
 		if (view == DRAW_VIEW || view == CURVE_VIEW || view == PROFILE_DRAW || view == PROFILE_EDIT || view == CROSS_DRAW || view == CROSS_EDIT) {
 			// Drawing Lines (no Lighting)
