@@ -220,6 +220,29 @@ public:
 		return -1; // No point within threshold found.
 	}
 
+	glm::vec3 getWorldPos() {
+		glm::vec2 mouse = cursorPosScreenCoords();
+		glm::mat4 M = glm::mat4(1.0);
+		glm::mat4 V = camera.getView();
+		glm::mat4 P = glm::perspective(glm::radians(45.0f), aspect, 0.01f, 1000.f);
+		glm::vec4 viewport = glm::vec4(0, 0, screenWidth, screenHeight);
+
+		glm::vec3 worldPos = glm::unProject(glm::vec3(mouse, 0.f), M, P, viewport);
+		return worldPos;
+	}
+
+	glm::vec3 getRayDirection() {
+		glm::vec2 mouse = cursorPosScreenCoords();
+		glm::mat4 M = glm::mat4(1.0);
+		glm::mat4 V = camera.getView();
+		glm::mat4 P = glm::perspective(glm::radians(45.0f), aspect, 0.01f, 1000.f);
+		glm::vec4 viewport = glm::vec4(0, 0, screenWidth, screenHeight);
+		glm::vec3 worldPos = glm::unProject(glm::vec3(mouse, 0.f), M, P, viewport);
+
+		glm::vec3 rayDirection = glm::normalize(glm::unProject(glm::vec3(mouse, 1.f), M, P, viewport) - worldPos);
+		return rayDirection;
+	}
+
 	bool rightMouseDown;
 	bool leftMouseDown;
 	int currentFrame;
@@ -557,9 +580,11 @@ int main()
 		if ((view == DRAW_VIEW || view == PROFILE_DRAW || view == CROSS_DRAW) && cb->leftMouseDown)
 		{
 			glm::vec4 cursorPos;
+			// regular drawing mode (if user is drawing the object or user is making a cross section
 			if (view == DRAW_VIEW || view == CROSS_DRAW) {
 				cursorPos = cam.getCursorPos(cb->getCursorPosGL());
 			}
+			// alternate drawing mode if user is drawing on the axis (may change)
 			else if (view == PROFILE_DRAW) {
 				glm::vec3 fixed = meshes[selectedObjectIndex].fixed;
 				glm::vec3 nochange = fixed - glm::normalize(glm::abs(cam.getPos()));
@@ -585,6 +610,7 @@ int main()
 
 				lineInProgress->updateGPU();
 
+				// if line is in progress and user reaches the other boundary line, end the line in progress
 				if (view == CROSS_DRAW) {
 					int newindex = cb->indexOfPointAtCursorPos(static_points[abs(1 - selectedCurveIndex)].verts, pointSize, cam);
 					if (newindex != -1) {
@@ -610,6 +636,7 @@ int main()
 				}
 
 			}
+			// line drawing adds a new line if there are less than 2 lines
 			else if ((view == DRAW_VIEW || view == PROFILE_DRAW) && lines.size() < 2)
 			{
 				// create a new line
@@ -617,6 +644,7 @@ int main()
 				lineInProgress = &lines.back();
 				lineInProgress->updateGPU();
 			}
+			// exception is cross section drawing where the boundary lines are shown
 			else if (view == CROSS_DRAW && lines.size() < 3) {
 				selectedPointIndex = -1;
 				for (int i = 0; i < static_points.size(); i++) {
@@ -639,6 +667,7 @@ int main()
 				}
 			}
 		}
+		//clean up lines, run chaikin if mouse is lifted
 		else if (!(cb->leftMouseDown) && lineInProgress != nullptr)
 		{
 			if (view == CROSS_DRAW || lineInProgress->verts.size() < 4) {
@@ -665,6 +694,7 @@ int main()
 			lineInProgress = nullptr;
 		}
 
+		// grab initial point to drag points in progress
 		if ((view == CURVE_VIEW || view == CROSS_EDIT || view == PROFILE_EDIT) && cb->leftMouseJustPressed()) {
 			selectedPointIndex = -1;
 			selectedCurveIndex = -1;
@@ -677,9 +707,9 @@ int main()
 				}
 			}
 		}
-
+		// drag points
 		else if ((view == CURVE_VIEW || view == CROSS_EDIT || view == PROFILE_EDIT) && cb->leftMouseDown && selectedPointIndex != -1) {
-			if (view == CURVE_VIEW) {
+			if (view == CURVE_VIEW || view == PROFILE_EDIT) {
 				modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
 				modify_points[selectedCurveIndex].updateGPU();
 
@@ -695,7 +725,7 @@ int main()
 				lines[selectedCurveIndex+2].BSpline(precision, lines[selectedCurveIndex].col);
 				lines[selectedCurveIndex+2].updateGPU();
 			}
-			else if (view == PROFILE_EDIT) {
+			/*else if (view == PROFILE_EDIT) {
 				glm::vec3 fixed = meshes[selectedObjectIndex].fixed;
 				glm::vec3 nochange = fixed - glm::normalize(glm::abs(cam.getPos()));
 				glm::vec3 drawaxis = meshes[selectedObjectIndex].getAxis();
@@ -707,7 +737,7 @@ int main()
 				lines[selectedCurveIndex].verts = modify_points[selectedCurveIndex].verts;
 				lines[selectedCurveIndex].BSpline(precision, lines[selectedCurveIndex].col);
 				lines[selectedCurveIndex].updateGPU();
-			}
+			}*/
 			pointsInProgress = nullptr;
 			lineInProgress = nullptr;
 		}
@@ -719,6 +749,7 @@ int main()
 		ImGui::NewFrame();
 		bool change = false; // Whether any ImGui variable's changed.
 
+		// free view (has object selection, go to draw mode, or export to obj)
 		if (view == FREE_VIEW)
 		{
 			ImGui::Begin("Free View");
@@ -751,6 +782,7 @@ int main()
 				}
 			}
 		}
+		// draw view (can be done in any of the 3 angles)
 		else if (view == DRAW_VIEW)
 		{
 			ImGui::Begin("Draw Mode");
@@ -786,6 +818,7 @@ int main()
 			if (lines.size() == 2)
 				ImGui::PopStyleColor();
 			ImGui::ColorEdit3("New Object Color", (float*)&lineColor);
+			// if there are lines on the screen you can edit the curves
 			if (lines.size() > 0) {
 				if (ImGui::Button("Edit Curve(s)")) {
 					view = CURVE_VIEW;
@@ -797,6 +830,7 @@ int main()
 					}
 
 				}
+				// clear lines and points
 				if (ImGui::Button("Clear Lines"))
 				{
 					static_points.clear();
@@ -805,6 +839,7 @@ int main()
 				}
 			}
 
+			// if 2 lines, user can create
 			if (lines.size() == 2)
 			{
 				if (ImGui::Button("Create Rotational Blending Surface"))
@@ -817,6 +852,7 @@ int main()
 					meshInProgress->ctrlpts2 = modify_points.back().verts;
 					lines.pop_back();
 					modify_points.pop_back();
+					// sets default 'sweep'/'crosssection'
 					meshInProgress->sweep = cam.getcircle(precision);
 					meshInProgress->cam = cam;
 					meshInProgress->create(precision);
@@ -826,6 +862,7 @@ int main()
 				}
 			}
 		}
+		// if in object view
 		else if (view == OBJECT_VIEW)
 		{
 			std::string frameTitle = "Object View - Object " + std::to_string(selectedObjectIndex);
@@ -833,23 +870,25 @@ int main()
 
 			ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
 
+			// user can apply a color to the object
 			if (ImGui::Button("Apply Color"))
 			{
 				meshes[selectedObjectIndex].setColor(meshCol);
 			}
-
+			// can choose to modify the object
 			if (ImGui::Button("Modify Object Curves")) {
 				view = CURVE_VIEW;
+				// goes back to camera that the object was created in 
 				cam = meshes[selectedObjectIndex].cam;
 
 				lines.clear();
 				modify_points.clear();
 
+				// pulls control points from mesh, gets BSpline
 				lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts1.verts));
 				lineInProgress = &lines.back();
 
 				modify_points.emplace_back(Line(lineInProgress->verts));
-
 				lineInProgress->setColor(meshes[selectedObjectIndex].color);
 				lineInProgress->BSpline(precision, lineInProgress->col);
 				lineInProgress->updateGPU();
@@ -875,11 +914,13 @@ int main()
 				pointsInProgress->updateGPU();
 				pointsInProgress = nullptr;
 			}
-
+			// modify the profile curves of the object
 			if (ImGui::Button("Modify Object Profile")) {
 				view = PROFILE_VIEW;
 			}
+			// modify cross section
 			if (ImGui::Button("Modify Object Cross-Section")) {
+				// gets 2 curves, makes them 'static points' that are not changeable
 				view = CROSS_VIEW;
 				cam = meshes[selectedObjectIndex].cam;
 
@@ -923,6 +964,7 @@ int main()
 			}
 
 			ImGui::Text("");
+			// delete mesh
 			if (ImGui::Button("Delete"))
 			{
 				meshes.erase(meshes.begin() + selectedObjectIndex);
@@ -930,14 +972,17 @@ int main()
 				change = true;
 				selectedObjectIndex = -1;
 			}
-			if (ImGui::Button("Cancel"))
+			// cancel
+			if (ImGui::Button("Return to Free View"))
 			{
 				view = FREE_VIEW;
 				change = true;
+				// reset linecolor
 				lineColor = stashedColor;
 				selectedObjectIndex = -1;
 			}
 		}
+		// if in Curve View
 		else if (view == CURVE_VIEW) {
 			if (selectedObjectIndex == -1) {
 				std::string frameTitle = "Curve Modification - Object " + std::to_string(int(meshes.size()) + int(floor((lines.size() - 1) / 2)));
@@ -947,6 +992,7 @@ int main()
 					view = DRAW_VIEW;
 					change = true;
 				}
+				// brings back points from static points, resets 
 				if (ImGui::Button("Cancel")) {
 					lines.clear();
 					modify_points.clear();
@@ -969,6 +1015,7 @@ int main()
 					view = DRAW_VIEW;
 				}
 			}
+			// accept changes pushes curves to object, updates GPU
 			else {
 				std::string frameTitle = "Curve Modification - Object " + std::to_string(selectedObjectIndex);
 				ImGui::Begin(frameTitle.c_str());
@@ -1168,10 +1215,19 @@ int main()
 					modify_points.clear();
 					static_points.clear();
 
-					meshes[selectedObjectIndex].create(precision);
-					meshes[selectedObjectIndex].updateGPU();
+					modify_points.emplace_back(Line(meshes[selectedObjectIndex].sweep.verts));
+					pointsInProgress = &modify_points.back();
+					
+					pointsInProgress->BSpline(50, black);
+					pointsInProgress->updateGPU();
+					
+					pointsInProgress = nullptr;
 
-					view = CROSS_VIEW;
+					//meshes[selectedObjectIndex].create(precision);
+					//meshes[selectedObjectIndex].updateGPU();
+
+					cam.unFix();
+					//view = CROSS_VIEW;
 				}
 			}
 			

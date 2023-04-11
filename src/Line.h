@@ -174,11 +174,20 @@ public:
 		glm::vec3 p1 = verts[0].position;
 		glm::vec3 p2 = verts.back().position;
 
-		glm::vec3 scalevec = -1.f * (fixed - current.getUp()) + 1.f * current.getUp();
+		//glm::vec3 scalevec = -1.f * (fixed - current.getUp()) + 1.f * current.getUp();
+
+		glm::vec3 scalevec(1.f);
+
+		//std::cout << fixed << std::endl;
+		//std::cout << current.getUp() << std::endl;
+		//std::cout << scalevec << std::endl;
 
 		glm::vec3 center = 0.5f * (p1 + p2);
 		glm::vec3 d = p2 - p1;
-		float dtheta = glm::orientedAngle(glm::normalize(current.getUp()), glm::normalize(d), -glm::normalize(current.getPos()));
+		float dtheta = fabs(glm::orientedAngle(glm::normalize(current.getUp()), glm::normalize(d), -glm::normalize(current.getPos())));
+
+		//if (dtheta > M_PI_2) dtheta = dtheta - M_PI;
+		//std::cout << dtheta << std::endl;
 
 		glm::mat4 T1 = glm::translate(glm::mat4(1.f), -center);
 		glm::mat4 R1 = glm::rotate(glm::mat4(1.f), -dtheta, -current.getPos());
@@ -188,11 +197,11 @@ public:
 		std::vector<Vertex> temp = verts;
 		verts.clear();
 		for (int i = 0; i < temp.size() - 1; i++) {
-			glm::vec3 newp = (S2 * R1 * T1 * glm::vec4(temp[i].position, 1.f));
+			glm::vec3 newp = (R1 * T1 * glm::vec4(temp[i].position, 1.f));
 			verts.push_back(Vertex{ newp, col, glm::vec3(0.f, 0.f, 0.f) });
 		}
 		for (int j = temp.size() - 1; j > 0; j--) {
-			glm::vec3 newp2 = (S2 * S1 * R1 * T1 * glm::vec4(temp[j].position, 1.f));
+			glm::vec3 newp2 = (R2 * R1 * T1 * glm::vec4(temp[j].position, 1.f));
 			verts.push_back(Vertex{ newp2, col, glm::vec3(0.f, 0.f, 0.f) });
 		}
 	}

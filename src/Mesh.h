@@ -167,13 +167,12 @@ public:
 		float scale = 0.5 * glm::length(diameter);
 		
 		glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3{ scale, scale, scale });
-		glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
+		glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, -cam.getPos());
 		glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 
 		for (int j = 0; j < sweep.verts.size(); j++) {
 			glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
-			glm::vec3 normal = glm::normalize(point - cvert);
-			disc.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+			disc.emplace_back(Vertex{ glm::vec4(point, 1.f), color, glm::vec3(0.f)});
 		}
 
 		return disc;
@@ -215,6 +214,8 @@ public:
 
 		orderlines(Spline1, Spline2);
 
+		std::vector<Vertex> disc;
+
 		for (int i = 0; i <= sprecision; i++) {
 
 			cvert = 0.5f * (Spline1[i].position + Spline2[i].position);
@@ -240,20 +241,25 @@ public:
 				glm::vec3 scaleby = pscale * unfixed + scale * fixed;
 
 				glm::mat4 S = glm::scale(glm::mat4(1.f), scaleby);
-				glm::mat4 R = glm::rotate(glm::mat4(1.f), -theta, cam.getPos());
+				glm::mat4 R = glm::rotate(glm::mat4(1.f), theta, -cam.getPos());
 				glm::mat4 T = glm::translate(glm::mat4(1.f), cvert);
 
+				disc.clear();
 				for (int j = 0; j < sweep.verts.size(); j++) {
 					glm::vec3 point = T * R * S * glm::vec4(sweep.verts[j].position, 1.f);
 
 					glm::vec3 normal = glm::vec3(0.f);
 
-					verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, normal });
+					verts.emplace_back(Vertex{ glm::vec4(point, 1.f), color, glm::vec3(0.f) });
+					disc.push_back(verts.back());
 				}
+
+				discs.push_back(disc);
 			}
 
 			else {
-				std::vector<Vertex> disc = stdgetdisc(cvert, diameter, theta);
+				disc.clear();
+				disc = stdgetdisc(cvert, diameter, theta);
 				int k = 0;
 				for (auto j = disc.begin(); j < disc.end(); j++) {
 					verts.emplace_back((*j));
@@ -298,7 +304,6 @@ public:
 
 		temppinch1.verts.clear();
 		temppinch2.verts.clear();
-
 	}
 
 	glm::vec3 getAxis() {
