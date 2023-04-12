@@ -349,19 +349,19 @@ void drawInteractiveCurve(std::vector<Line> &lines, std::vector<Line> &points, L
 	pointsInProgress = nullptr;
 }
 
-void updateMesh(Mesh& mesh, std::vector<Line>& bounds, Line profile1, Line profile2, Line crosssection, int precision) {
+void updateMesh(Mesh& mesh, Line bound1, Line bound2, Line profile1, Line profile2, Line crosssection, int precision, glm::vec3 color) {
 	Mesh newmesh;
 	Mesh tempmesh;
 
-	if (profile1.verts.size() == 0 && profile2.verts.size()) {
-		newmesh.ctrlpts1 = bounds[0].verts;
-		newmesh.ctrlpts2 = bounds[1].verts;
+	if (profile1.verts.size() != 0 && profile2.verts.size() != 0) {
+		newmesh.ctrlpts1 = bound1.verts;
+		newmesh.ctrlpts2 = bound2.verts;
 		newmesh.cam = mesh.cam;
 		newmesh.sweep = mesh.cam.getcircle(precision);
 		newmesh.create(precision);
+		tempmesh = newmesh.gettempmesh();
 
 		glm::vec3 axis = newmesh.getAxis();
-
 		// fix angle
 		// first isolate to direction of up
 		glm::vec3 testup = axis * mesh.cam.getUp();
@@ -369,10 +369,6 @@ void updateMesh(Mesh& mesh, std::vector<Line>& bounds, Line profile1, Line profi
 			axis = axis * (glm::vec3(-1.f));
 		}
 		float ptheta = glm::orientedAngle(newmesh.cam.getUp(), axis, -newmesh.cam.getPos());
-
-		//tempmesh = newmesh.gettempmesh(ptheta);
-		//tempmesh.create(precision);
-		//tempmesh.updateGPU();
 
 		mesh.pinch1 = profile1.verts;
 		tempmesh.pinch1 = profile1.verts;
@@ -387,14 +383,15 @@ void updateMesh(Mesh& mesh, std::vector<Line>& bounds, Line profile1, Line profi
 			(*j).normal = glm::rotate(glm::mat4(1.f), ptheta, -newmesh.cam.getPos()) * glm::vec4((*j).normal, 0.f);
 			mesh.verts.push_back((*j));
 		}
-		mesh.ctrlpts1 = bounds[0].verts;
-		mesh.ctrlpts2 = bounds[1].verts;
+		mesh.ctrlpts1 = bound1.verts;
+		mesh.ctrlpts2 = bound2.verts;
+		mesh.setColor(color);
 		mesh.updateGPU();
 	}
 
 	else {
-		mesh.ctrlpts1 = bounds[0].verts;
-		mesh.ctrlpts2 = bounds[1].verts;
+		mesh.ctrlpts1 = bound1.verts;
+		mesh.ctrlpts2 = bound2.verts;
 		mesh.sweep = mesh.cam.getcircle(precision);
 		mesh.create(precision);
 		mesh.updateGPU();
@@ -934,21 +931,9 @@ int main()
 			if (ImGui::Button("Modify Object Profile")) {
 				view = PROFILE_VIEW;
 			
-				tempmesh.verts.clear();
-				tempmesh.indices.clear();
-
-				glm::vec3 axis = meshes[selectedObjectIndex].getAxis();
-
-				// fix angle
-				// first isolate to direction of up
-				glm::vec3 testup = axis * meshes[selectedObjectIndex].cam.getUp();
-				if ((testup.x + testup.y + testup.z) < 0) {
-					axis = axis * (glm::vec3(-1.f));
-				}
-				profiletheta = glm::orientedAngle(meshes[selectedObjectIndex].cam.getUp(), axis, -meshes[selectedObjectIndex].cam.getPos());
-
-				tempmesh = meshes[selectedObjectIndex].gettempmesh(profiletheta);
+				tempmesh = meshes[selectedObjectIndex].gettempmesh();
 				tempmesh.create(precision);
+				updateMesh(tempmesh, tempmesh.ctrlpts1.verts, tempmesh.ctrlpts2.verts, meshes[selectedObjectIndex].pinch1.verts, meshes[selectedObjectIndex].pinch2.verts, tempmesh.sweep.verts, precision, tempmesh.color);
 				tempmesh.updateGPU();
 
 				if (fabs(cam.phi - 0.f) < 0.1f && fabs(cam.theta - 0.f) < 0.1f) {
@@ -1074,7 +1059,7 @@ int main()
 				ImGui::Begin(frameTitle.c_str());
 				if (ImGui::Button("Accept Changes"))
 				{
-					updateMesh(meshes[selectedObjectIndex], modify_points, Line(meshes[selectedObjectIndex].pinch1.verts), Line(meshes[selectedObjectIndex].pinch2.verts), Line(meshes[selectedObjectIndex].sweep.verts), precision);
+					updateMesh(meshes[selectedObjectIndex], Line(modify_points[0].verts), Line(modify_points[1].verts), Line(meshes[selectedObjectIndex].pinch1.verts), Line(meshes[selectedObjectIndex].pinch2.verts), Line(meshes[selectedObjectIndex].sweep.verts), precision, meshes[selectedObjectIndex].color);
 					modify_points.clear();
 					lines.clear();
 					view = OBJECT_VIEW;
@@ -1119,17 +1104,8 @@ int main()
 						pinches.clear();
 					}
 				}
-				if (ImGui::Button("Cancel")) {
-					meshes[selectedObjectIndex].verts.clear();
-					for (auto j = tempmesh.verts.begin(); j < tempmesh.verts.end(); j++) {
-						(*j).position = glm::translate(glm::mat4(1.f), meshes[selectedObjectIndex].getCenter()) * glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).position, 1.f);
-						(*j).normal = glm::rotate(glm::mat4(1.f), profiletheta, -meshes[selectedObjectIndex].cam.getPos()) * glm::vec4((*j).normal, 0.f);
-						meshes[selectedObjectIndex].verts.push_back((*j));
-					}
-					meshes[selectedObjectIndex].updateGPU();
-
+				if (ImGui::Button("Exit to Object View")) {
 					cam = oldcam;
-
 					tempmesh.verts.clear();
 					tempmesh.updateGPU();
 					modify_points.clear();
@@ -1150,12 +1126,10 @@ int main()
 				}
 				if (lines.size() == 2 && meshes.size() != 0) {
 					if (ImGui::Button("Accept Changes")) {
-						meshes[selectedObjectIndex].pinch1 = Line(modify_points.back().verts);
-						tempmesh.pinch1 = Line(modify_points.back().verts);
-						modify_points.pop_back();
-						meshes[selectedObjectIndex].pinch2 = Line(modify_points.back().verts);
-						tempmesh.pinch2 = Line(modify_points.back().verts);
-						modify_points.pop_back();
+						updateMesh(meshes[selectedObjectIndex], Line(meshes[selectedObjectIndex].ctrlpts1.verts), Line(meshes[selectedObjectIndex].ctrlpts2.verts), Line(modify_points[0].verts), Line(modify_points[1].verts), Line(meshes[selectedObjectIndex].sweep.verts), precision, meshes[selectedObjectIndex].color);
+						
+						tempmesh.pinch1 = modify_points[0].verts;
+						tempmesh.pinch2 = modify_points[1].verts;
 						tempmesh.create(precision);
 						tempmesh.updateGPU();
 

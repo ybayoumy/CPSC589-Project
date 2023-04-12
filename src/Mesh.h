@@ -198,13 +198,25 @@ public:
 		return point;
 	}
 
-	Mesh gettempmesh(float profiletheta) {
+	Mesh gettempmesh() {
 		Mesh tempmesh;
 		tempmesh.ctrlpts1 = Line(ctrlpts1.verts);
 		tempmesh.ctrlpts2 = Line(ctrlpts2.verts);
 		tempmesh.sweep = Line(sweep.verts);
+		tempmesh.pinch1 = Line(tempmesh.pinch1.verts);
+		tempmesh.pinch2 = Line(tempmesh.pinch2.verts);
 		tempmesh.cam = cam;
 		tempmesh.color = color;
+
+		glm::vec3 axis = getAxis();
+
+		// fix angle
+		// first isolate to direction of up
+		glm::vec3 testup = axis * cam.getUp();
+		if ((testup.x + testup.y + testup.z) < 0) {
+			axis = axis * (glm::vec3(-1.f));
+		}
+		float profiletheta = glm::orientedAngle(cam.getUp(), axis, -cam.getPos());
 
 		for (auto j = tempmesh.ctrlpts1.verts.begin(); j < tempmesh.ctrlpts1.verts.end(); j++) {
 			(*j).position = glm::rotate(glm::mat4(1.f), -profiletheta, -cam.getPos()) * glm::translate(glm::mat4(1.f), -getCenter()) * glm::vec4((*j).position, 1.f);
