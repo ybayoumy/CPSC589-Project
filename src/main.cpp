@@ -330,7 +330,7 @@ std::vector<Line> generateAxisLines()
 	return axisLines;
 }
 
-void drawInteractiveCurve(std::vector<Line> &lines, std::vector<Line> &points, Line controlpoints, glm::vec3 lineColor, glm::vec3 pointColor, int precision) {
+void drawCurve(std::vector<Line> &lines, std::vector<Line> &points, Line controlpoints, glm::vec3 lineColor, glm::vec3 pointColor, int precision) {
 	Line* lineInProgress = nullptr;
 	Line* pointsInProgress = nullptr;
 
@@ -392,13 +392,11 @@ void updateMesh(Mesh& mesh, Line bound1, Line bound2, Line profile1, Line profil
 	else {
 		mesh.ctrlpts1 = bound1.verts;
 		mesh.ctrlpts2 = bound2.verts;
-		mesh.sweep = mesh.cam.getcircle(precision);
+		mesh.sweep = crosssection.verts;
 		mesh.create(precision);
 		mesh.updateGPU();
 	}
 }
-
-//void updateStandardMesh()
 
 // return true if export was successful, false otherwise
 bool exportToObj(std::string filename, std::vector<Mesh> &meshes)
@@ -672,14 +670,26 @@ int main()
 						selectedPointIndex = -1;
 						lineInProgress->updateGPU();
 						lineInProgress->ChaikinAlg(2);
-						modify_points.emplace_back(Line(lineInProgress->verts));
 
-						pointsInProgress = &modify_points.back();
-						pointsInProgress->setColor(black);
-						pointsInProgress->updateGPU();
+						Line mypoints = Line(lineInProgress->verts);
+						lines.pop_back();
+						lineInProgress = nullptr;
 
-						lineInProgress->BSpline(precision, lineColor);
+						Line newdiameter;
+						newdiameter.verts.push_back(mypoints.verts[0]);
+						newdiameter.verts.push_back(mypoints.verts.back());
+
+						drawCurve(lines, modify_points, mypoints.verts, lineColor, black, 50);
+
+						static_points.emplace_back(newdiameter.verts);
+						lineInProgress = &static_points.back();
+						lineInProgress->setColor(black);
 						lineInProgress->updateGPU();
+
+						static_points[0].setColor(black);
+						static_points[0].updateGPU();
+						static_points[1].setColor(black);
+						static_points[1].updateGPU();
 
 						pointsInProgress = nullptr;
 						lineInProgress = nullptr;
@@ -698,7 +708,7 @@ int main()
 				lineInProgress->updateGPU();
 			}
 			// exception is cross section drawing where the boundary lines are shown
-			else if (view == CROSS_DRAW && lines.size() < 3) {
+			else if (view == CROSS_DRAW && lines.size() < 1) {
 				selectedPointIndex = -1;
 				for (int i = 0; i < static_points.size(); i++) {
 					if (selectedPointIndex == -1) {
@@ -708,8 +718,6 @@ int main()
 						if (selectedPointIndex != -1) {
 							static_points[selectedCurveIndex].verts[selectedPointIndex].color = lineColor;
 							static_points[selectedCurveIndex].updateGPU();
-							//static_points[abs(1 - selectedCurveIndex)].verts[selectedPointIndex].color = lineColor;
-							//static_points[abs(1 - selectedCurveIndex)].updateGPU();
 
 							// create a new line
 							lines.emplace_back(std::vector<Vertex>{static_points[selectedCurveIndex].verts[selectedPointIndex], Vertex{ cursorPos, lineColor, glm::vec3(0.0f) }});
@@ -762,22 +770,11 @@ int main()
 		}
 		// drag points
 		else if ((view == CURVE_VIEW || view == CROSS_EDIT || view == PROFILE_EDIT) && cb->leftMouseDown && selectedPointIndex != -1) {
-			if (view == CURVE_VIEW || view == PROFILE_EDIT) {
-				modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
-				modify_points[selectedCurveIndex].updateGPU();
-
-				lines[selectedCurveIndex].verts = modify_points[selectedCurveIndex].verts;
-				lines[selectedCurveIndex].BSpline(precision, lines[selectedCurveIndex].col);
-				lines[selectedCurveIndex].updateGPU();
-			}
-			else if (view == CROSS_EDIT) {
-				modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
-				modify_points[selectedCurveIndex].updateGPU();
-
-				lines[selectedCurveIndex + 2].verts = modify_points[selectedCurveIndex].verts;
-				lines[selectedCurveIndex + 2].BSpline(precision, lines[selectedCurveIndex].col);
-				lines[selectedCurveIndex + 2].updateGPU();
-			}
+			modify_points[selectedCurveIndex].verts[selectedPointIndex].position = cam.getCursorPos(cb->getCursorPosGL());
+			modify_points[selectedCurveIndex].updateGPU();
+			lines[selectedCurveIndex].verts = modify_points[selectedCurveIndex].verts;
+			lines[selectedCurveIndex].BSpline(precision, lines[selectedCurveIndex].col);
+			lines[selectedCurveIndex].updateGPU();
 			pointsInProgress = nullptr;
 			lineInProgress = nullptr;
 		}
@@ -924,8 +921,8 @@ int main()
 				lines.clear();
 				modify_points.clear();
 
-				drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].ctrlpts1.verts), meshes[selectedObjectIndex].color, black, precision);
-				drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].ctrlpts2.verts), meshes[selectedObjectIndex].color, black, precision);
+				drawCurve(lines, modify_points, Line(meshes[selectedObjectIndex].ctrlpts1.verts), meshes[selectedObjectIndex].color, black, precision);
+				drawCurve(lines, modify_points, Line(meshes[selectedObjectIndex].ctrlpts2.verts), meshes[selectedObjectIndex].color, black, precision);
 			}
 			// modify the profile curves of the object
 			if (ImGui::Button("Modify Object Profile")) {
@@ -961,44 +958,6 @@ int main()
 				// gets 2 curves, makes them 'static points' that are not changeable
 				view = CROSS_VIEW;
 				cam = meshes[selectedObjectIndex].cam;
-
-				lines.clear();
-				modify_points.clear();
-
-				lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts1.verts));
-				lineInProgress = &lines.back();
-
-				static_points.emplace_back(Line(lineInProgress->verts));
-
-				lineInProgress->setColor(black);
-				lineInProgress->BSpline(precision, lineInProgress->col);
-				lineInProgress->updateGPU();
-				lineInProgress = nullptr;
-
-				pointsInProgress = &static_points.back();
-				pointsInProgress->setColor(black);
-				pointsInProgress->BSpline(40, black);
-				pointsInProgress->updateGPU();
-				pointsInProgress = nullptr;
-
-				lines.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts2.verts));
-				lineInProgress = &lines.back();
-
-				static_points.emplace_back(Line(lineInProgress->verts));
-
-				lineInProgress->setColor(black);
-				lineInProgress->BSpline(precision, lineInProgress->col);
-				lineInProgress->updateGPU();
-				lineInProgress = nullptr;
-
-				pointsInProgress = &static_points.back();
-				pointsInProgress->setColor(black);
-				pointsInProgress->BSpline(40, black);
-				pointsInProgress->updateGPU();
-				pointsInProgress = nullptr;
-
-				stashedColor = lineColor;
-				lineColor = meshes[selectedObjectIndex].color;
 			}
 
 			ImGui::Text("");
@@ -1089,8 +1048,8 @@ int main()
 						lines.clear();
 						modify_points.clear();
 						
-						drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].pinch1.verts), meshes[selectedObjectIndex].color, black, precision);
-						drawInteractiveCurve(lines, modify_points, Line(meshes[selectedObjectIndex].pinch2.verts), meshes[selectedObjectIndex].color, black, precision);
+						drawCurve(lines, modify_points, Line(meshes[selectedObjectIndex].pinch1.verts), meshes[selectedObjectIndex].color, black, precision);
+						drawCurve(lines, modify_points, Line(meshes[selectedObjectIndex].pinch2.verts), meshes[selectedObjectIndex].color, black, precision);
 					}
 					else {
 						lines.clear();
@@ -1098,8 +1057,8 @@ int main()
 
 						std::vector<Line> pinches = tempmesh.getPinches(precision);
 
-						drawInteractiveCurve(lines, modify_points, Line(pinches[0].verts), meshes[selectedObjectIndex].color, black, precision);
-						drawInteractiveCurve(lines, modify_points, Line(pinches[1].verts), meshes[selectedObjectIndex].color, black, precision);
+						drawCurve(lines, modify_points, Line(pinches[0].verts), meshes[selectedObjectIndex].color, black, precision);
+						drawCurve(lines, modify_points, Line(pinches[1].verts), meshes[selectedObjectIndex].color, black, precision);
 
 						pinches.clear();
 					}
@@ -1152,9 +1111,74 @@ int main()
 			ImGui::Begin(frameTitle.c_str());
 
 			if (ImGui::Button("Draw New Object Cross-Section")) {
+
+				lines.clear();
+				modify_points.clear();
+				static_points.clear();
+
+				static_points.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts1.verts));
+				pointsInProgress = &static_points.back();
+				pointsInProgress->setColor(black);
+				pointsInProgress->BSpline(20, black);
+				pointsInProgress->updateGPU();
+				pointsInProgress = nullptr;
+
+				static_points.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts2.verts));
+				pointsInProgress = &static_points.back();
+				pointsInProgress->setColor(black);
+				pointsInProgress->BSpline(20, black);
+				pointsInProgress->updateGPU();
+				pointsInProgress = nullptr;
+
+				stashedColor = lineColor;
+				lineColor = meshes[selectedObjectIndex].color;
+
 				view = CROSS_DRAW;
 			}
 			if (ImGui::Button("Edit Existing Object Cross-Section")) {
+
+				lines.clear();
+				modify_points.clear();
+				static_points.clear();
+
+				static_points.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts1.verts));
+				pointsInProgress = &static_points.back();
+				pointsInProgress->setColor(black);
+				pointsInProgress->BSpline(20, black);
+				pointsInProgress->updateGPU();
+				pointsInProgress = nullptr;
+
+				static_points.emplace_back(Line(meshes[selectedObjectIndex].ctrlpts2.verts));
+				pointsInProgress = &static_points.back();
+				pointsInProgress->setColor(black);
+				pointsInProgress->BSpline(20, black);
+				pointsInProgress->updateGPU();
+				pointsInProgress = nullptr;
+
+				stashedColor = lineColor;
+				lineColor = meshes[selectedObjectIndex].color;
+
+				glm::vec3 p1 = static_points[0].verts[floor(static_points[0].verts.size() / 2)].position;
+				glm::vec3 p2 = static_points[1].verts[floor(static_points[0].verts.size() / 2)].position;
+
+				Line mypoints = meshes[selectedObjectIndex].getCrosssection(p1, p2, glm::vec3(1.f) - glm::abs(glm::normalize(cam.getPos())));
+				if (mypoints.verts.size() > 25) {
+					mypoints.ChaikinAlg(2);
+				}
+				
+				drawCurve(lines, modify_points, Line(mypoints.verts), meshes[selectedObjectIndex].color, black, 50);
+
+				Line newdiameter;
+				newdiameter.verts.push_back(mypoints.verts[0]);
+				newdiameter.verts.push_back(mypoints.verts.back());
+
+				static_points.emplace_back(newdiameter.verts);
+				lineInProgress = &static_points.back();
+				lineInProgress->setColor(black);
+				lineInProgress->updateGPU();
+
+				lineInProgress = nullptr;
+
 				view = CROSS_EDIT;
 			}
 			if (ImGui::Button("Cancel")) {
@@ -1168,27 +1192,18 @@ int main()
 			std::string frameTitle = "Cross-Section Modification - Object " + std::to_string(selectedObjectIndex);
 			ImGui::Begin(frameTitle.c_str());
 			
-			if (lines.size() == 3){
+			if (lines.size() == 1){
 				if (ImGui::Button("Accept Changes")) {
 					Line newcross;
-					meshes[selectedObjectIndex].setcrosssection(modify_points.back().verts, meshes[selectedObjectIndex].fixed, precision);
+					meshes[selectedObjectIndex].setcrosssection(modify_points.back().verts, glm::vec3(1.f) - glm::abs(glm::normalize(cam.getPos())), precision);
+					
+					updateMesh(meshes[selectedObjectIndex], meshes[selectedObjectIndex].ctrlpts1.verts, meshes[selectedObjectIndex].ctrlpts2.verts, meshes[selectedObjectIndex].pinch1.verts, meshes[selectedObjectIndex].pinch2.verts, meshes[selectedObjectIndex].sweep.verts, precision, meshes[selectedObjectIndex].color);
+
 					lines.clear();
 					modify_points.clear();
 					static_points.clear();
 
-					modify_points.emplace_back(Line(meshes[selectedObjectIndex].sweep.verts));
-					pointsInProgress = &modify_points.back();
-					
-					pointsInProgress->BSpline(50, black);
-					pointsInProgress->updateGPU();
-					
-					pointsInProgress = nullptr;
-
-					//meshes[selectedObjectIndex].create(precision);
-					//meshes[selectedObjectIndex].updateGPU();
-
-					cam.unFix();
-					//view = CROSS_VIEW;
+					view = CROSS_VIEW;
 				}
 			}
 			
@@ -1324,6 +1339,7 @@ int main()
 				cb->noLightingViewPipeline();
 				for (Line& ctrl : static_points)
 				{
+					ctrl.draw();
 					ctrl.drawPoints(pointSize);
 				}
 			}

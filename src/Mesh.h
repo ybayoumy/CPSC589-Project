@@ -150,10 +150,6 @@ public:
 	Line pinch1;
 	Line pinch2;
 
-	glm::vec3 fixed;
-	glm::vec3 unfixed;
-	glm::vec3 up;
-
 	//glm::vec3 direction;
 	//glm::vec3 updirection;
 
@@ -390,15 +386,47 @@ public:
 
 		Line temp;
 		temp = Line(cross);
-		temp.getCrossSection(cam, fixed);
-		//cam.standardize(temp.verts);
-
-		crosssection = temp.verts;
+		temp.MakeCrossSection(cam, fixed);
+		temp.MakeSweep(cam, fixed);
+		cam.standardize(temp.verts);
 		temp.BSpline(precision, color);
 
-		sweep = temp.verts;
+		sweep.verts = temp.verts;
 	}
 
+	Line getCrosssection(glm::vec3 p1, glm::vec3 p2, glm::vec3 fixed) {
+		if (crosssection.verts.size() > 0) return crosssection.verts;
+		else {
+			glm::vec3 scalevec = -1.f * fixed + 2.f * glm::abs(glm::normalize(cam.getUp()));
+
+			glm::vec3 center = 0.5f * (p1 + p2);
+			glm::vec3 d = p2 - p1;
+
+			// fix angle
+			// first isolate to direction of up
+			glm::vec3 testup = d * cam.getUp();
+			if ((testup.x + testup.y + testup.z) < 0) {
+				d = d * (glm::vec3(-1.f));
+			}
+
+			float dtheta = glm::orientedAngle(glm::normalize(cam.getUp()), glm::normalize(d), -glm::normalize(cam.getPos()));
+
+			glm::mat4 T1 = glm::translate(glm::mat4(1.f), center);
+			glm::mat4 R1 = glm::rotate(glm::mat4(1.f), dtheta, -cam.getPos());
+			glm::mat4 S1 = glm::scale(glm::mat4(1.f), glm::vec3(2 / glm::length(d), 2 / glm::length(d), 2 / glm::length(d)));
+
+			Line output;
+			for (int i = floor(1 * (sweep.verts.size() + 1) / 4); i < floor(3 * (sweep.verts.size() + 1) / 4); i++) {
+				output.verts.push_back(sweep.verts[i]);
+			}
+			cam.standardize(output.verts);
+			for (auto i = output.verts.begin(); i < output.verts.end(); i++) {
+				(*i).position = T1 * glm::inverse(S1) * R1 * glm::vec4((*i).position, 1.f);
+			}
+			return output;
+		}
+	}
+	
 	void draw() {
 		geometry.bind();
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
