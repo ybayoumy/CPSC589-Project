@@ -357,7 +357,7 @@ void updateMesh(Mesh& mesh, Line bound1, Line bound2, Line profile1, Line profil
 		newmesh.ctrlpts1 = bound1.verts;
 		newmesh.ctrlpts2 = bound2.verts;
 		newmesh.cam = mesh.cam;
-		newmesh.sweep = mesh.cam.getcircle(precision);
+		newmesh.sweep = crosssection.verts;
 		newmesh.create(precision);
 		tempmesh = newmesh.gettempmesh();
 
@@ -930,7 +930,8 @@ int main()
 			
 				tempmesh = meshes[selectedObjectIndex].gettempmesh();
 				tempmesh.create(precision);
-				updateMesh(tempmesh, tempmesh.ctrlpts1.verts, tempmesh.ctrlpts2.verts, meshes[selectedObjectIndex].pinch1.verts, meshes[selectedObjectIndex].pinch2.verts, tempmesh.sweep.verts, precision, tempmesh.color);
+				updateMesh(tempmesh, tempmesh.ctrlpts1.verts, tempmesh.ctrlpts2.verts, meshes[selectedObjectIndex].pinch1.verts, meshes[selectedObjectIndex].pinch2.verts, meshes[selectedObjectIndex].sweep.verts, precision, tempmesh.color);
+				tempmesh.crosssection = meshes[selectedObjectIndex].crosssection.verts;
 				tempmesh.updateGPU();
 
 				if (fabs(cam.phi - 0.f) < 0.1f && fabs(cam.theta - 0.f) < 0.1f) {

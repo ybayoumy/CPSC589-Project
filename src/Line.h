@@ -198,17 +198,29 @@ public:
 		}
 	}
 
-	void MakeSweep(Camera current, glm::vec3 fixed){
+	void MakeSweep(Camera current, glm::vec3 fixed, glm::vec3 axis){
+
+		glm::vec3 regscale = glm::vec3(1.f);
+		glm::vec3 testup = current.getUp() * axis;
+
+		if ((testup.x + testup.y + testup.z) < 0) {
+			regscale =  glm::vec3(1.f) - 2.f * glm::abs(glm::normalize(current.getUp()));
+			std::cout << regscale << std::endl;
+		}
+
 		glm::vec3 scalevec = -1.f * fixed + 2.f * glm::abs(glm::normalize(current.getUp()));
+		
+		glm::mat4 S = glm::scale(glm::mat4(1.f), regscale);
 		glm::mat4 S1 = glm::scale(glm::mat4(1.f), scalevec);
 
 		std::vector<Vertex> temp = verts;
 		verts.clear();
 		for (int i = 0; i < temp.size(); i++) {
-			verts.push_back(temp[i]);
+			glm::vec3 newp1 = S * glm::vec4(temp[i].position, 1.f);
+			verts.push_back(Vertex{ newp1, col, glm::vec3(0.f, 0.f, 0.f) });
 		}
 		for (int j = temp.size() - 1; j >= 0; j--) {
-			glm::vec3 newp2 = S1 * glm::vec4(temp[j].position, 1.f);
+			glm::vec3 newp2 = S1 * S * glm::vec4(temp[j].position, 1.f);
 			verts.push_back(Vertex{ newp2, col, glm::vec3(0.f, 0.f, 0.f) });
 		}
 	}
