@@ -889,6 +889,7 @@ int main()
 					meshInProgress->ctrlpts2 = modify_points.back().verts;
 					lines.pop_back();
 					modify_points.pop_back();
+
 					// sets default 'sweep'/'crosssection'
 					meshInProgress->sweep = cam.getcircle(precision);
 					meshInProgress->cam = cam;

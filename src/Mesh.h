@@ -22,17 +22,7 @@ void orderlines(std::vector<Vertex>& Line1, std::vector<Vertex>& Line2) {
 
 	int min = std::distance(std::begin(distances), std::min_element(std::begin(distances), std::end(distances)));
 
-	if (min == 0) {
-
-	}
-	else if (min == 1) {
-		std::reverse(Line2.begin(), Line2.end());
-	}
-	else if (min == 2) {
-		std::reverse(Line1.begin(), Line1.end());
-	}
-	else {
-		std::reverse(Line1.begin(), Line1.end());
+	if (min == 1 || min == 2) {
 		std::reverse(Line2.begin(), Line2.end());
 	}
 }
@@ -262,14 +252,10 @@ public:
 		height = glm::distance(sweep.verts[0].position,sweep.verts[floor(sweep.verts.size() / 2)].position);
 		width = glm::distance(sweep.verts[floor(1 * sweep.verts.size() / 4)].position, sweep.verts[floor(3 * sweep.verts.size() / 4)].position);
 
-		std::cout << height << std::endl;
-		std::cout << width << std::endl;
-
 		orderlines(Spline1, Spline2);
 		std::vector<Vertex> disc;
 
 		for (int i = 0; i <= sprecision; i++) {
-
 			cvert = 0.5f * (Spline1[i].position + Spline2[i].position);
 			axis.push_back(Vertex{ glm::vec4(cvert, 1.f), color, glm::vec3(0.f, 0.f, 0.f) });
 
@@ -309,9 +295,7 @@ public:
 				}
 
 				discs.push_back(disc);
-			}
-
-			else {
+			} else {
 				disc.clear();
 				disc = stdgetdisc(cvert, diameter, theta);
 				int k = 0;
@@ -329,6 +313,12 @@ public:
 		}
 
 		// NORMALS CALCULATION
+		float flipNormal = 1.0f;
+		glm::vec3 axisDir = axis[axis.size() - 1].position - axis[0].position;
+		float sumOfComponents = axisDir.x + axisDir.y + axisDir.z;
+		if (sumOfComponents < 0) {
+			flipNormal = -1.0f;
+		}
 
 		glm::vec3 nextONring;
 		glm::vec3 nextring;
@@ -353,8 +343,8 @@ public:
 					nextring = verts[i - sweep.verts.size()].position - verts[i].position;
 				}
 			}
-			verts[i].normal = glm::cross(nextONring, nextring);
-		}
+			verts[i].normal = flipNormal * glm::cross(nextONring, nextring);
+		}	
 
 		updateindices(indices, sweep.verts.size(), sprecision);
 
@@ -467,8 +457,6 @@ public:
 		, sweep()
 		, width(2.f)
 		, height(2.f)
-		//, pinch1()
-		//, pinch2()
 		, cam(c)
 	{}
 
@@ -481,8 +469,6 @@ public:
 		, sweep()
 		, width(2.f)
 		, height(2.f)
-		//, pinch1()
-		//, pinch2()
 		, cam(0, 0, 1)
 	{}
 };
