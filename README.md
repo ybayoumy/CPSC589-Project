@@ -1,23 +1,35 @@
 Installment and Execution:
+
+
 git clone the repository github link to install the project. Once the project is installed you then right-click the project folder and open it in Visual Studio. Finally, in Visual Studio
 there should be a run debug green play symbol on the top center of the screen with a drop down menu next to it. Click the drop down menu and select "589-project.exe". Then click on the
 the run program button.
 
 Program Usage and Features:
+
+
 -Once you open the program you will in free view mode and unable to draw.
+
 -On the top right there is a button that says draw mode which will let you draw curves.
+
 -You are given 3 non-free views of XY,XZ,ZY
 
 -Once you have drawn 2 curves you will be presented with the option to apply a Rotational blending surface.
+
 -Now that you have an object you can also change it's color  with the RGB options infront of you.
+
 -You may modify the curves you drew to define the object.
+
 -You can modify the profile of the object, draw more curves to edit the shape into a more complex one.
+
 -finally you may also apply a cross section to the object.
 
 -Once you have created/drawn your desired object. Return to free view mode and give your object a name then export it as an obj.
 
 
 Where to find created OBJ files:
+
+
 [project path]/out/build/x64-Debug
 
 
