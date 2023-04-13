@@ -599,6 +599,9 @@ int main()
 	int selectedObjectIndex = -1;
 	glm::vec3 meshCol;
 
+	int chaikin_iter = 2;
+	bool chaikin_change = true;
+
 	enum ViewType
 	{
 		FREE_VIEW,
@@ -669,7 +672,7 @@ int main()
 						selectedCurveIndex = -1;
 						selectedPointIndex = -1;
 						lineInProgress->updateGPU();
-						lineInProgress->ChaikinAlg(2);
+						lineInProgress->ChaikinAlg(chaikin_iter);
 
 						Line mypoints = Line(lineInProgress->verts);
 						lines.pop_back();
@@ -732,16 +735,18 @@ int main()
 		else if (!(cb->leftMouseDown) && lineInProgress != nullptr)
 		{
 			if (view == CROSS_DRAW || lineInProgress->verts.size() < 4) {
-				static_points[0].setColor(black);
-				static_points[0].updateGPU();
-				static_points[1].setColor(black);
-				static_points[1].updateGPU();
-				selectedPointIndex = -1;
-				selectedCurveIndex = -1;
+				if (view == CROSS_DRAW) {
+					static_points[0].setColor(black);
+					static_points[0].updateGPU();
+					static_points[1].setColor(black);
+					static_points[1].updateGPU();
+					selectedPointIndex = -1;
+					selectedCurveIndex = -1;
+				}
 				lines.pop_back();
 			}
 			else {
-				lineInProgress->ChaikinAlg(2);
+				lineInProgress->ChaikinAlg(chaikin_iter);
 				modify_points.emplace_back(Line(lineInProgress->verts));
 
 				pointsInProgress = &modify_points.back();
@@ -929,11 +934,14 @@ int main()
 			if (ImGui::Button("Modify Object Profile")) {
 				view = PROFILE_VIEW;
 			
+				cam = meshes[selectedObjectIndex].cam;
+
 				tempmesh = meshes[selectedObjectIndex].gettempmesh();
 				tempmesh.create(precision);
 				updateMesh(tempmesh, tempmesh.ctrlpts1.verts, tempmesh.ctrlpts2.verts, meshes[selectedObjectIndex].pinch1.verts, meshes[selectedObjectIndex].pinch2.verts, meshes[selectedObjectIndex].sweep.verts, precision, tempmesh.color);
 				tempmesh.crosssection = meshes[selectedObjectIndex].crosssection.verts;
 				tempmesh.updateGPU();
+
 
 				if (fabs(cam.phi - 0.f) < 0.1f && fabs(cam.theta - 0.f) < 0.1f) {
 					oldcam = cam;
@@ -986,6 +994,31 @@ int main()
 			if (selectedObjectIndex == -1) {
 				std::string frameTitle = "Curve Modification - Object " + std::to_string(int(meshes.size()) + int(floor((lines.size() - 1) / 2)));
 				ImGui::Begin(frameTitle.c_str());
+
+				if (modify_points[0].verts.size() > 4) {
+					if (ImGui::Button("Decrease Control Points")) {
+						for (int i = 0; i < modify_points.size(); i++) {
+							modify_points[i].ChaikinAlg(1);
+							modify_points[i].updateGPU();
+
+							lines[i].verts = modify_points[i].verts;
+							lines[i].BSpline(precision, lines[i].col);
+							lines[i].updateGPU();
+						}
+					}
+				}
+
+				if (ImGui::Button("Increase Control Points")) {
+					for (int i = 0; i < modify_points.size(); i++) {
+						modify_points[i].RegChaikinAlg(1);
+						modify_points[i].updateGPU();
+
+						lines[i].verts = modify_points[i].verts;
+						lines[i].BSpline(precision, lines[i].col);
+						lines[i].updateGPU();
+					}
+				}
+
 				if (ImGui::Button("Accept Changes"))
 				{
 					view = DRAW_VIEW;
@@ -1018,6 +1051,7 @@ int main()
 			else {
 				std::string frameTitle = "Curve Modification - Object " + std::to_string(selectedObjectIndex);
 				ImGui::Begin(frameTitle.c_str());
+
 				if (ImGui::Button("Accept Changes"))
 				{
 					updateMesh(meshes[selectedObjectIndex], Line(modify_points[0].verts), Line(modify_points[1].verts), Line(meshes[selectedObjectIndex].pinch1.verts), Line(meshes[selectedObjectIndex].pinch2.verts), Line(meshes[selectedObjectIndex].sweep.verts), precision, meshes[selectedObjectIndex].color);
@@ -1085,6 +1119,33 @@ int main()
 					if (lines.size() == 2)
 						ImGui::PopStyleColor();
 				}
+
+				if (view == PROFILE_EDIT) {
+					if (modify_points[0].verts.size() > 4) {
+						if (ImGui::Button("Decrease Control Points")) {
+							for (int i = 0; i < modify_points.size(); i++) {
+								modify_points[i].ChaikinAlg(1);
+								modify_points[i].updateGPU();
+
+								lines[i].verts = modify_points[i].verts;
+								lines[i].BSpline(precision, lines[i].col);
+								lines[i].updateGPU();
+							}
+						}
+					}
+
+					if (ImGui::Button("Increase Control Points")) {
+						for (int i = 0; i < modify_points.size(); i++) {
+							modify_points[i].RegChaikinAlg(1);
+							modify_points[i].updateGPU();
+
+							lines[i].verts = modify_points[i].verts;
+							lines[i].BSpline(precision, lines[i].col);
+							lines[i].updateGPU();
+						}
+					}
+				}
+
 				if (lines.size() == 2 && meshes.size() != 0) {
 					if (ImGui::Button("Accept Changes")) {
 						updateMesh(meshes[selectedObjectIndex], Line(meshes[selectedObjectIndex].ctrlpts1.verts), Line(meshes[selectedObjectIndex].ctrlpts2.verts), Line(modify_points[0].verts), Line(modify_points[1].verts), Line(meshes[selectedObjectIndex].sweep.verts), precision, meshes[selectedObjectIndex].color);
@@ -1165,7 +1226,7 @@ int main()
 
 				Line mypoints = meshes[selectedObjectIndex].getCrosssection(p1, p2, glm::vec3(1.f) - glm::abs(glm::normalize(cam.getPos())));
 				if (mypoints.verts.size() > 25) {
-					mypoints.ChaikinAlg(2);
+					mypoints.ChaikinAlg(chaikin_iter);
 				}
 				
 				drawCurve(lines, modify_points, Line(mypoints.verts), meshes[selectedObjectIndex].color, black, 50);
@@ -1194,6 +1255,32 @@ int main()
 			std::string frameTitle = "Cross-Section Modification - Object " + std::to_string(selectedObjectIndex);
 			ImGui::Begin(frameTitle.c_str());
 			
+			if (view == CROSS_EDIT) {
+				if (modify_points[0].verts.size() > 4) {
+					if (ImGui::Button("Decrease Control Points")) {
+						for (int i = 0; i < modify_points.size(); i++) {
+							modify_points[i].ChaikinAlg(1);
+							modify_points[i].updateGPU();
+
+							lines[i].verts = modify_points[i].verts;
+							lines[i].BSpline(precision, lines[i].col);
+							lines[i].updateGPU();
+						}
+					}
+				}
+
+				if (ImGui::Button("Increase Control Points")) {
+					for (int i = 0; i < modify_points.size(); i++) {
+						modify_points[i].RegChaikinAlg(1);
+						modify_points[i].updateGPU();
+
+						lines[i].verts = modify_points[i].verts;
+						lines[i].BSpline(precision, lines[i].col);
+						lines[i].updateGPU();
+					}
+				}
+			}
+
 			if (lines.size() == 1){
 				if (ImGui::Button("Accept Changes")) {
 					Line newcross;
@@ -1214,7 +1301,6 @@ int main()
 				view = CROSS_VIEW;
 			}
 		}
-
 
 		if (ImGui::BeginPopupModal("ExportObjSuccessPopup"))
 		{
@@ -1294,6 +1380,7 @@ int main()
 				}
 				cb->updateShadingUniforms(lightPos, d, a);
 				meshes[i].draw();
+				//std::cout << meshes[i].getAxis() << std::endl;
 			}
 		}
 		else if (view == CURVE_VIEW || view == PROFILE_EDIT || view == CROSS_EDIT || view == CROSS_DRAW) {}

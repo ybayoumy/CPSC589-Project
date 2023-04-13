@@ -361,7 +361,6 @@ public:
 
 			std::vector<Vertex> disc = (*i);
 			if (crosssection.verts.size() > 0) {
-				std::cout << "reached" << std::endl;
 				output1.verts.push_back(disc[floor(1 * sprecision / 4)]);
 				output2.verts.push_back(disc[floor(3 * sprecision / 4)]);
 			}
