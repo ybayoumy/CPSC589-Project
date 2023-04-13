@@ -148,6 +148,43 @@ public:
 		}
 	}
 
+	void RegChaikinAlg(int iter) {
+		glm::vec3 newpoint;
+		std::vector<Vertex> Chaikin;
+		for (int n = 0; n < iter; n++) {
+
+			Chaikin.clear();
+			int m = verts.size();
+
+			// F[0] = C[0]
+			newpoint = verts[0].position;
+			Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
+
+			// F[1] = 1/2 C[0] + 1/2 C[1]
+			newpoint = 0.5f * verts[0].position + 0.5f * verts[1].position;
+			Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
+
+			for (int i = 1; i <= m - 2; i += 1) {
+				// F[2i] = 3/4C[i] + 1/4C[i+1]
+				newpoint = 0.75f * verts[i].position + 0.25f * verts[i + 1].position;
+				Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
+				// F[2i+1] = 1/4C[i] + 3/4C[i+1]
+				newpoint = 0.25f * verts[i].position + 0.75f * verts[i + 1].position;
+				Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
+			}
+
+			// F[2*m-2] = 1/2C[m-2] + 1/2C[m-1]
+			newpoint = 0.5f * verts[m - 2].position + 0.5f * verts[m - 1].position;
+			Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
+
+			// F[2*m-1] = C[m-1]
+			newpoint = verts[m-1].position;
+			Chaikin.push_back(Vertex{ newpoint, col, glm::vec3(0.f) });
+
+			verts = Chaikin;
+		}
+	}
+
 	void setColor(glm::vec3 mycolor) {
 		for (auto i = verts.begin(); i < verts.end(); i++) {
 			(*i).color = mycolor;

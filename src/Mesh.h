@@ -262,9 +262,6 @@ public:
 		height = glm::distance(sweep.verts[0].position,sweep.verts[floor(sweep.verts.size() / 2)].position);
 		width = glm::distance(sweep.verts[floor(1 * sweep.verts.size() / 4)].position, sweep.verts[floor(3 * sweep.verts.size() / 4)].position);
 
-		std::cout << height << std::endl;
-		std::cout << width << std::endl;
-
 		orderlines(Spline1, Spline2);
 		std::vector<Vertex> disc;
 
@@ -371,7 +368,6 @@ public:
 
 			std::vector<Vertex> disc = (*i);
 			if (crosssection.verts.size() > 0) {
-				std::cout << "reached" << std::endl;
 				output1.verts.push_back(disc[floor(1 * sprecision / 4)]);
 				output2.verts.push_back(disc[floor(3 * sprecision / 4)]);
 			}
