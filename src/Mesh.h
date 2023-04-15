@@ -370,8 +370,8 @@ public:
 			}
 		}
 
-		output1.ChaikinAlg(4);
-		output2.ChaikinAlg(4);
+		output1.ChaikinAlg(1);
+		output2.ChaikinAlg(1);
 
 		output.emplace_back(Line(output1.verts));
 		output.emplace_back(Line(output2.verts));
