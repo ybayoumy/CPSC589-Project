@@ -514,7 +514,7 @@ int main()
 	ShaderProgram pickerShader("shaders/nolighting3D.vert", "shaders/picker.frag");
 
 	Camera cam(glm::radians(0.f), glm::radians(0.f), 3.0);
-	cam.fix();
+	cam.unFix();
 	auto cb = std::make_shared<Callbacks3D>(lightingShader, noLightingShader, pickerShader, cam, window.getWidth(), window.getHeight());
 
 	// CALLBACKS
@@ -795,13 +795,6 @@ int main()
 		if (view == FREE_VIEW)
 		{
 			ImGui::Begin("Free View");
-			if (ImGui::Button("Draw Mode"))
-			{
-				view = DRAW_VIEW;
-				change = true;
-			}
-
-			ImGui::Text("");
 			ImGui::Text("Export to .obj");
 			ImGui::InputText("Filename", ObjFilename, size_t(32));
 			if (sizeof(ObjFilename) > 0 && ImGui::Button("Save"))
@@ -823,19 +816,19 @@ int main()
 					lastExportedFilename = "";
 				}
 			}
+
+			ImGui::Text("");
+			if (ImGui::Button("Go To Draw Mode"))
+			{
+				view = DRAW_VIEW;
+				change = true;
+			}
 		}
 		// draw view (can be done in any of the 3 angles)
 		else if (view == DRAW_VIEW)
 		{
 			ImGui::Begin("Draw Mode");
-			if (ImGui::Button("Free View"))
-			{
-				view = FREE_VIEW;
-				change = true;
-				lines.clear();
-			}
 
-			ImGui::Text("");
 			if (ImGui::Button("View XY Plane") && lines.size() == 0)
 			{
 				cam.phi = 0.f;
@@ -852,14 +845,16 @@ int main()
 				cam.theta = 0.f;
 			}
 			ImGui::Text("");
-			std::string linesDrawn = "Lines Drawn: " + std::to_string(lines.size()) + "/" + std::to_string(2);
 
+			ImGui::ColorEdit3("New Object Color", (float*)&lineColor);
+			ImGui::Text("");
+
+			std::string linesDrawn = "Lines Drawn: " + std::to_string(lines.size()) + "/" + std::to_string(2);
 			if (lines.size() == 2)
 				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 			ImGui::Text(linesDrawn.c_str());
 			if (lines.size() == 2)
 				ImGui::PopStyleColor();
-			ImGui::ColorEdit3("New Object Color", (float*)&lineColor);
 			// if there are lines on the screen you can edit the curves
 			if (lines.size() > 0) {
 				if (ImGui::Button("Edit Curve(s)")) {
@@ -904,6 +899,14 @@ int main()
 					meshInProgress = nullptr;
 				}
 			}
+
+			ImGui::Text("");
+			if (ImGui::Button("Return To Free View"))
+			{
+				view = FREE_VIEW;
+				change = true;
+				lines.clear();
+			}
 		}
 		// if in object view
 		else if (view == OBJECT_VIEW)
@@ -911,13 +914,6 @@ int main()
 			std::string frameTitle = "Object View - Object " + std::to_string(selectedObjectIndex);
 			ImGui::Begin(frameTitle.c_str());
 
-			ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
-
-			// user can apply a color to the object
-			if (ImGui::Button("Apply Color"))
-			{
-				meshes[selectedObjectIndex].setColor(meshCol);
-			}
 			// can choose to modify the object
 			if (ImGui::Button("Modify Object Curves")) {
 				view = CURVE_VIEW;
@@ -971,14 +967,16 @@ int main()
 			}
 
 			ImGui::Text("");
-			// delete mesh
-			if (ImGui::Button("Delete"))
+
+			ImGui::ColorEdit3("Object Color", glm::value_ptr(meshCol));
+
+			// user can apply a color to the object
+			if (ImGui::Button("Apply Color"))
 			{
-				meshes.erase(meshes.begin() + selectedObjectIndex);
-				view = FREE_VIEW;
-				change = true;
-				selectedObjectIndex = -1;
+				meshes[selectedObjectIndex].setColor(meshCol);
 			}
+
+			ImGui::Text("");
 			// cancel
 			if (ImGui::Button("Return to Free View"))
 			{
@@ -988,12 +986,31 @@ int main()
 				lineColor = stashedColor;
 				selectedObjectIndex = -1;
 			}
+			// delete mesh
+			if (ImGui::Button("Delete"))
+			{
+				meshes.erase(meshes.begin() + selectedObjectIndex);
+				view = FREE_VIEW;
+				change = true;
+				selectedObjectIndex = -1;
+			}
 		}
 		// if in Curve View
 		else if (view == CURVE_VIEW) {
 			if (selectedObjectIndex == -1) {
 				std::string frameTitle = "Curve Modification - Object " + std::to_string(int(meshes.size()) + int(floor((lines.size() - 1) / 2)));
 				ImGui::Begin(frameTitle.c_str());
+
+				if (ImGui::Button("Increase Control Points")) {
+					for (int i = 0; i < modify_points.size(); i++) {
+						modify_points[i].RegChaikinAlg(1);
+						modify_points[i].updateGPU();
+
+						lines[i].verts = modify_points[i].verts;
+						lines[i].BSpline(precision, lines[i].col);
+						lines[i].updateGPU();
+					}
+				}
 
 				if (modify_points[0].verts.size() > 4) {
 					if (ImGui::Button("Decrease Control Points")) {
@@ -1008,16 +1025,7 @@ int main()
 					}
 				}
 
-				if (ImGui::Button("Increase Control Points")) {
-					for (int i = 0; i < modify_points.size(); i++) {
-						modify_points[i].RegChaikinAlg(1);
-						modify_points[i].updateGPU();
-
-						lines[i].verts = modify_points[i].verts;
-						lines[i].BSpline(precision, lines[i].col);
-						lines[i].updateGPU();
-					}
-				}
+				ImGui::Text("");
 
 				if (ImGui::Button("Accept Changes"))
 				{
@@ -1052,6 +1060,32 @@ int main()
 				std::string frameTitle = "Curve Modification - Object " + std::to_string(selectedObjectIndex);
 				ImGui::Begin(frameTitle.c_str());
 
+				if (ImGui::Button("Increase Control Points")) {
+					for (int i = 0; i < modify_points.size(); i++) {
+						modify_points[i].RegChaikinAlg(1);
+						modify_points[i].updateGPU();
+
+						lines[i].verts = modify_points[i].verts;
+						lines[i].BSpline(precision, lines[i].col);
+						lines[i].updateGPU();
+					}
+				}
+
+				if (modify_points[0].verts.size() > 4) {
+					if (ImGui::Button("Decrease Control Points")) {
+						for (int i = 0; i < modify_points.size(); i++) {
+							modify_points[i].ChaikinAlg(1);
+							modify_points[i].updateGPU();
+
+							lines[i].verts = modify_points[i].verts;
+							lines[i].BSpline(precision, lines[i].col);
+							lines[i].updateGPU();
+						}
+					}
+				}
+
+				ImGui::Text("");
+
 				if (ImGui::Button("Accept Changes"))
 				{
 					updateMesh(meshes[selectedObjectIndex], Line(modify_points[0].verts), Line(modify_points[1].verts), Line(meshes[selectedObjectIndex].pinch1.verts), Line(meshes[selectedObjectIndex].pinch2.verts), Line(meshes[selectedObjectIndex].sweep.verts), precision, meshes[selectedObjectIndex].color);
@@ -1071,9 +1105,6 @@ int main()
 		else if (view == PROFILE_VIEW || view == PROFILE_DRAW || view == PROFILE_EDIT) {
 			std::string frameTitle = "Profile Modification - Object " + std::to_string(selectedObjectIndex);
 			ImGui::Begin(frameTitle.c_str());
-
-			ImGui::Text("");
-
 			if (view == PROFILE_VIEW) {
 				if (ImGui::Button("Draw New Object Profile")) {
 					view = PROFILE_DRAW;
@@ -1099,6 +1130,8 @@ int main()
 						pinches.clear();
 					}
 				}
+
+				ImGui::Text("");
 				if (ImGui::Button("Exit to Object View")) {
 					cam = oldcam;
 					tempmesh.verts.clear();
@@ -1110,7 +1143,6 @@ int main()
 			}
 
 			else if (view == PROFILE_DRAW || view == PROFILE_EDIT) {
-				ImGui::Text("");
 				std::string linesDrawn = "Lines Drawn: " + std::to_string(lines.size()) + "/" + std::to_string(2);
 				if (view == PROFILE_DRAW) {
 					if (lines.size() == 2)
@@ -1118,9 +1150,22 @@ int main()
 					ImGui::Text(linesDrawn.c_str());
 					if (lines.size() == 2)
 						ImGui::PopStyleColor();
+
+					ImGui::Text("");
 				}
 
 				if (view == PROFILE_EDIT) {
+					if (ImGui::Button("Increase Control Points")) {
+						for (int i = 0; i < modify_points.size(); i++) {
+							modify_points[i].RegChaikinAlg(1);
+							modify_points[i].updateGPU();
+
+							lines[i].verts = modify_points[i].verts;
+							lines[i].BSpline(precision, lines[i].col);
+							lines[i].updateGPU();
+						}
+					}
+
 					if (modify_points[0].verts.size() > 4) {
 						if (ImGui::Button("Decrease Control Points")) {
 							for (int i = 0; i < modify_points.size(); i++) {
@@ -1134,16 +1179,7 @@ int main()
 						}
 					}
 
-					if (ImGui::Button("Increase Control Points")) {
-						for (int i = 0; i < modify_points.size(); i++) {
-							modify_points[i].RegChaikinAlg(1);
-							modify_points[i].updateGPU();
-
-							lines[i].verts = modify_points[i].verts;
-							lines[i].BSpline(precision, lines[i].col);
-							lines[i].updateGPU();
-						}
-					}
+					ImGui::Text("");
 				}
 
 				if (lines.size() == 2 && meshes.size() != 0) {
@@ -1244,6 +1280,8 @@ int main()
 
 				view = CROSS_EDIT;
 			}
+
+			ImGui::Text("");
 			if (ImGui::Button("Cancel")) {
 				static_points.clear();
 				modify_points.clear();
@@ -1256,6 +1294,17 @@ int main()
 			ImGui::Begin(frameTitle.c_str());
 			
 			if (view == CROSS_EDIT) {
+				if (ImGui::Button("Increase Control Points")) {
+					for (int i = 0; i < modify_points.size(); i++) {
+						modify_points[i].RegChaikinAlg(1);
+						modify_points[i].updateGPU();
+
+						lines[i].verts = modify_points[i].verts;
+						lines[i].BSpline(precision, lines[i].col);
+						lines[i].updateGPU();
+					}
+				}
+
 				if (modify_points[0].verts.size() > 4) {
 					if (ImGui::Button("Decrease Control Points")) {
 						for (int i = 0; i < modify_points.size(); i++) {
@@ -1269,16 +1318,16 @@ int main()
 					}
 				}
 
-				if (ImGui::Button("Increase Control Points")) {
-					for (int i = 0; i < modify_points.size(); i++) {
-						modify_points[i].RegChaikinAlg(1);
-						modify_points[i].updateGPU();
-
-						lines[i].verts = modify_points[i].verts;
-						lines[i].BSpline(precision, lines[i].col);
-						lines[i].updateGPU();
-					}
-				}
+				ImGui::Text("");
+			}
+			else if (view == CROSS_DRAW) {
+				std::string linesDrawn = "Lines Drawn: " + std::to_string(lines.size()) + "/" + std::to_string(1);
+				if (lines.size() == 1)
+					ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
+				ImGui::Text(linesDrawn.c_str());
+				if (lines.size() == 1)
+					ImGui::PopStyleColor();
+				ImGui::Text("");
 			}
 
 			if (lines.size() == 1){
