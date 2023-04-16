@@ -314,36 +314,47 @@ public:
 
 		// NORMALS CALCULATION
 		float flipNormal = 1.0f;
-		glm::vec3 axisDir = axis[axis.size() - 1].position - axis[0].position;
-		float sumOfComponents = axisDir.x + axisDir.y + axisDir.z;
-		if (sumOfComponents < 0) {
-			flipNormal = -1.0f;
-		}
+		
+		//glm::vec3 axisDir = axis[axis.size() - 1].position - axis[0].position;
+		//float sumOfComponents = axisDir.x + axisDir.y + axisDir.z;
+		//if (sumOfComponents < 0) {
+		//	flipNormal = -1.0f;
+		//}
+
+		glm::vec3 testnormal;
+		glm::vec3 realnormal;
 
 		glm::vec3 nextONring;
 		glm::vec3 nextring;
 		for (int i = 1; i < (verts.size()-1); i++) {
 			if (i % sweep.verts.size() == 0) {
 				if (i <= sweep.verts.size()) {
-					nextONring = verts[i - (sweep.verts.size() - 1)].position - verts[i].position;
-					nextring = verts[i + sweep.verts.size()].position - verts[i].position;
+					nextONring = glm::normalize(verts[i - (sweep.verts.size() - 1)].position - verts[i].position);
+					nextring = glm::normalize(verts[i + sweep.verts.size()].position - verts[i].position);
 				}
 				else {
-					nextONring = verts[i - 1].position - verts[i].position;
-					nextring = verts[i - sweep.verts.size()].position - verts[i].position;
+					nextONring = glm::normalize(verts[i - 1].position - verts[i].position);
+					nextring = glm::normalize(verts[i - sweep.verts.size()].position - verts[i].position);
 				}
 			}
 			else {
 				if (i <= sweep.verts.size()) {
-					nextONring = verts[i + 1].position - verts[i].position;
-					nextring = verts[i + sweep.verts.size()].position - verts[i].position;
+					nextONring = glm::normalize(verts[i + 1].position - verts[i].position);
+					nextring = glm::normalize(verts[i + sweep.verts.size()].position - verts[i].position);
 				}
 				else {
-					nextONring = verts[i - 1].position - verts[i].position;
-					nextring = verts[i - sweep.verts.size()].position - verts[i].position;
+					nextONring = glm::normalize(verts[i - 1].position - verts[i].position);
+					nextring = glm::normalize(verts[i - sweep.verts.size()].position - verts[i].position);
 				}
 			}
-			verts[i].normal = flipNormal * glm::cross(nextONring, nextring);
+			if (i == 1) {
+				testnormal = glm::normalize(glm::cross(nextONring, nextring));
+				realnormal = glm::normalize(verts[i].position - verts[0].position);
+				if (glm::length(testnormal + realnormal) < 1.f) {
+					flipNormal = -1.f;
+				}
+			}
+			verts[i].normal = flipNormal * glm::normalize(glm::cross(nextONring, nextring));
 		}	
 
 		updateindices(indices, sweep.verts.size(), sprecision);
