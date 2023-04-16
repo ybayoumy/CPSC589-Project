@@ -1094,12 +1094,14 @@ int main()
 					modify_points.clear();
 					lines.clear();
 					view = OBJECT_VIEW;
+					cam.unFix();
 				}
 				if (ImGui::Button("Cancel"))
 				{
 					modify_points.clear();
 					lines.clear();
 					view = OBJECT_VIEW;
+					cam.unFix();
 				}
 			}
 		}
@@ -1141,6 +1143,7 @@ int main()
 					modify_points.clear();
 					lines.clear();
 					view = OBJECT_VIEW;
+					cam.unFix();
 				}
 			}
 
@@ -1284,11 +1287,12 @@ int main()
 			}
 
 			ImGui::Text("");
-			if (ImGui::Button("Cancel")) {
+			if (ImGui::Button("Exit To Object View")) {
 				static_points.clear();
 				modify_points.clear();
 				lines.clear();
 				view = OBJECT_VIEW;
+				cam.unFix();
 			}
 		}
 		else if (view == CROSS_EDIT || view == CROSS_DRAW) {
