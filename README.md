@@ -1,93 +1,49 @@
-Installment and Execution:
-
-
-git clone the repository github link to install the project. Once the project is installed you then right-click the project folder and open it in Visual Studio. Finally, in Visual Studio
-there should be a run debug green play symbol on the top center of the screen with a drop down menu next to it. Click the drop down menu and select "589-project.exe". Then click on the
-the run program button.
-
-Program Usage and Features:
-
-
--Once you open the program you will in free view mode and unable to draw.
-
--On the top right there is a button that says draw mode which will let you draw curves.
-
--You are given 3 non-free views of XY,XZ,ZY
-
--Once you have drawn 2 curves you will be presented with the option to apply a Rotational blending surface.
-
--Now that you have an object you can also change it's color  with the RGB options infront of you.
-
--You may modify the curves you drew to define the object.
-
--You can modify the profile of the object, draw more curves to edit the shape into a more complex one.
-
--finally you may also apply a cross section to the object.
-
--Once you have created/drawn your desired object. Return to free view mode and give your object a name then export it as an obj.
-
-
-Where to find created OBJ files:
-
-
-[project path]/out/build/x64-Debug
-
-
-
 # CPSC589-Project
 
-This skeleton builds upon the 589/689 assignment skeleton as well as the 453 Assignment 4 skeleton.
+## How To Run
 
-However, there are some important differences highlighted in a below section.
+1. Clone this repository
+1. Download Visual Studio (2019 is known to work with this)
+1. Open the repository's base directory with Visual Studio
+1. The CMakeLists.txt file should run automatically
+1. Click the drop down menu and select "589-project.exe" to run the program
 
-You are encouraged to modify this skeleton, and any of the files within, in any way you want or need in order to complete your course project.
+## Program Usage/Controls
 
-If you have questions about this skeleton, its structure, or any of the classes, please feel free to email your TA.
+### Free View
 
-## Important Differences from Previous Skeletons
+- You are unable to draw in this mode
+- Use your scroll wheel to zoom in/out
+- Drag Right Click to look around the scene
+- Hover and Left click on an object to select it and go into [Object View](#object-view)
+- Export a `.obj` file by typing in the desired filename and clicking `Save`
+  - the `.obj` file will be created here: [project path]/out/build/x64-Debug
+- You can go to [Draw Mode](#draw-mode) from here
 
-### GLDebug
-In the 589/689 assignment skeleton, there was the following line of code to "ignore non-significant error/warning codes":
-```c++
-if(id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
-```
-For your projects, you might be modifying the skeleton much more than for the assignments, and there is a chance that these codes could serve some purpose.
+### Draw Mode
 
-Thus, this line has been commented out, but you can add it back in if you are being flooded with too many OpenGL messages in the console.
+- You are locked to the XY, XZ, or ZY Planes. You can Toggle through them using the provided buttons
+- Hold Left Click to draw a line
+- After drawing 2 lines, you can create an object by clicking "Create Rotational Blending Surface"
+- Other options include selecting a desired colour to sketch with, editing lines you've drawn, and clearing lines
+- After you're done creating objects, you can go back to [Free View](#free-view)
 
-### .obj File Loading
-A .obj file loader (GeomLoaderForOBJ) using the tinyobjloader library (added to "thirdparty") has been implemented.
+### Object View
 
-You may view the GeomLoaderForOBJ.h and GeomLoaderForOBJ.cpp comments for more details.
+- You can delete/recolour the selected object from here
+- You can modify the object's original object curves
+- You can modify the object's Cross-Section
+- You can modifty the object's profile curves
+- Afte you're done editing the object, you can go back to [Free View](#free-view)
 
-### VertexBuffer
-The way that "AttribArrays" are handled has been changed to accomodate objects that may or may not have certain attributes.
+### Object Cross Section
 
-For example, some .obj files may not have UV coordinates.
+An object's cross section defines the shape with which to create the rotational blending surface. By default, this cross-section is a circle.
 
-## Adding Your Own Textures & Models
+You can either edit the object's existing cross-section or draw a new one. Drawing a new cross section will require one new line to be drawn that defines the shape of half the cross-section. The other half is then mirrored. To draw a new cross-section, you must draw a line starting from one of the points on the lines and ending at one of the points on the other line.
 
-To add textures to the project, place them in the "textures" folder and make sure CMake is called again so that it can copy them over.
-In Visual Studio, this is as simple as opening up and saving CMakeLists.txt (even if you didn't change CMakeLists.txt) or clicking "Project > Configure Cache".
-The textures will be copied to the output directory in a directory also called textures.
-To path the textures in the program, do: "./textures/<File>" or "textures/<File>".
+### Object Profile
 
-The same is true for 3D .obj files placed in the "models" directory.
+An object's profile determines how it should be "pinched". This allows for the creation of more complex non-symetric objects
 
-A way to select models on your computer via a file dialog has not been added.
-Part of this is because different systems handle file dialogs differently, so adding this functionality could break the program on some computers.
-If you want to write it yourself, or pick a library to handle this, you are free to do so!
-
-## Current Controls
-
-The provided code gives you a spherical camera and renders a selected .obj file with generic Phong shading.
-
-To control the spherical camera:
-
- * Scroll wheel zooms in and out on the cube
- * Holding the right mouse button and dragging allows you to rotate the camera around the cube
-
-To switch objects, use the ImGui drop-down.
-
-The rest of the ImGui controls should be fairly intuitive.
-
+You can either edit the object's existing profile or draw a new one. Drawing a new profile will require two new lines to be drawn that define the shape of the object after "pinching" / "expanding". You can use the Object's original profile lines as reference of what these lines could look like.
