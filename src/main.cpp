@@ -906,6 +906,8 @@ int main()
 				view = FREE_VIEW;
 				change = true;
 				lines.clear();
+				static_points.clear();
+				modify_points.clear();
 			}
 		}
 		// if in object view
@@ -1030,7 +1032,7 @@ int main()
 				if (ImGui::Button("Accept Changes"))
 				{
 					view = DRAW_VIEW;
-					change = true;
+					//change = true;
 				}
 				// brings back points from static points, resets 
 				if (ImGui::Button("Cancel Changes")) {
